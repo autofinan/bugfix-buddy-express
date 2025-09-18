@@ -266,6 +266,36 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_data_access_log: {
+        Row: {
+          access_type: string
+          accessed_at: string | null
+          budget_id: string
+          id: string
+          ip_address: unknown | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          access_type: string
+          accessed_at?: string | null
+          budget_id: string
+          id?: string
+          ip_address?: unknown | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          access_type?: string
+          accessed_at?: string | null
+          budget_id?: string
+          id?: string
+          ip_address?: unknown | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           amount: number
@@ -595,6 +625,26 @@ export type Database = {
         Args: { budget_id_param: string }
         Returns: string
       }
+      get_budget_details_secure: {
+        Args: { budget_id_param: string }
+        Returns: {
+          converted_sale_id: string
+          created_at: string
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          discount_type: string
+          discount_value: number
+          id: string
+          notes: string
+          owner_id: string
+          status: Database["public"]["Enums"]["budget_status"]
+          subtotal: number
+          total: number
+          updated_at: string
+          valid_until: string
+        }[]
+      }
       get_budget_with_protected_customer_data: {
         Args: { budget_id_param: string }
         Returns: {
@@ -608,6 +658,31 @@ export type Database = {
           customer_phone: string
           discount_type: string
           discount_value: number
+          id: string
+          notes: string
+          owner_id: string
+          status: Database["public"]["Enums"]["budget_status"]
+          subtotal: number
+          total: number
+          updated_at: string
+          valid_until: string
+        }[]
+      }
+      get_budgets_secure: {
+        Args: {
+          limit_count?: number
+          offset_count?: number
+          search_term?: string
+        }
+        Returns: {
+          converted_sale_id: string
+          created_at: string
+          customer_email_masked: string
+          customer_name_masked: string
+          customer_phone_masked: string
+          discount_type: string
+          discount_value: number
+          has_customer_info: boolean
           id: string
           notes: string
           owner_id: string
@@ -637,6 +712,19 @@ export type Database = {
           total: number
           total_profit: number
           total_revenue: number
+        }[]
+      }
+      mask_customer_data: {
+        Args: {
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          is_owner: boolean
+        }
+        Returns: {
+          masked_email: string
+          masked_name: string
+          masked_phone: string
         }[]
       }
       search_budgets_safe: {
