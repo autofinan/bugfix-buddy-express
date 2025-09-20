@@ -8,17 +8,18 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import type { Product } from "./ProductsView";
-import { useCategories, useCreateProduct, useUpdateProduct } from "@/hooks/useProducts";
+import { useCategories } from "@/hooks/useCategories";
+import { useCreateProduct, useUpdateProduct } from "@/hooks/useProducts";
 
 interface ProductFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   product?: Product | null;
-  onSave: () => void;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
-export function ProductForm({ open, onOpenChange, product, onSave, onClose }: ProductFormProps) {
+export function ProductForm({ open, onOpenChange, product, onClose, onSuccess }: ProductFormProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -120,7 +121,8 @@ export function ProductForm({ open, onOpenChange, product, onSave, onClose }: Pr
         await createProductMutation.mutateAsync(productData);
       }
 
-      onSave();
+      onSuccess?.();
+      onClose();
     } catch (error: any) {
       console.error('Error saving product:', error);
       toast({

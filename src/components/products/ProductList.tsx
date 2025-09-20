@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Edit, Package } from "lucide-react";
-import type { Product } from "./ProductsView";
+import type { Product } from "@/hooks/useProducts";
 
 interface ProductListProps {
   products: Product[];
