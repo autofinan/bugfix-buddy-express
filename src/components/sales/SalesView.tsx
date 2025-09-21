@@ -9,11 +9,13 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+import { DateRange } from "react-day-picker";
+
 export default function SalesView() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   
-  const { data: sales = [], isLoading } = useSales(searchTerm, dateRange?.from, dateRange?.to);
+  const { data: sales = [], isLoading } = useSales(dateRange?.from, dateRange?.to, searchTerm);
 
   const totalSales = sales.reduce((sum, sale) => sum + sale.total, 0);
   const totalProfit = sales.reduce((sum, sale) => sum + (sale.total_profit || 0), 0);
@@ -71,8 +73,8 @@ export default function SalesView() {
             />
           </div>
           <DateRangePicker
-            value={dateRange}
-            onChange={setDateRange}
+            date={dateRange}
+            onDateChange={setDateRange}
           />
         </div>
 

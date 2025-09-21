@@ -76,16 +76,16 @@ export default function StockAdjustmentView() {
           <div className="space-y-4">
             <div>
               <Label htmlFor="product-search">Produto</Label>
-              <SearchDropdown
-                options={productOptions}
-                value={selectedProduct?.id || ""}
-                onSelect={(value) => {
-                  const product = products.find(p => p.id === value);
-                  setSelectedProduct(product);
-                }}
-                placeholder="Buscar produto..."
-                emptyText="Nenhum produto encontrado"
-              />
+            <SearchDropdown
+              options={productOptions}
+              value={selectedProduct?.id || ""}
+              onValueChange={(value) => {
+                const product = products.find(p => p.id === value);
+                setSelectedProduct(product);
+              }}
+              placeholder="Buscar produto..."
+              emptyMessage="Nenhum produto encontrado"
+            />
             </div>
 
             <div>

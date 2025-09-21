@@ -25,9 +25,11 @@ import { ptBR } from "date-fns/locale";
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))'];
 
+import { DateRange } from "react-day-picker";
+
 export default function ReportsView() {
   const [reportType, setReportType] = useState("sales");
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date())
   });
@@ -38,11 +40,11 @@ export default function ReportsView() {
   // Filter sales by date range
   const filteredSales = sales.filter(sale => {
     const saleDate = new Date(sale.date);
-    return saleDate >= dateRange.from && saleDate <= dateRange.to;
+    return dateRange?.from && dateRange?.to && saleDate >= dateRange.from && saleDate <= dateRange.to;
   });
 
   // Sales by day chart data
-  const salesByDay = eachDayOfInterval({
+  const salesByDay = dateRange?.from && dateRange?.to ? eachDayOfInterval({
     start: dateRange.from,
     end: dateRange.to
   }).map(day => {
@@ -61,7 +63,7 @@ export default function ReportsView() {
       vendas: total,
       quantidade: daySales.length
     };
-  });
+  }) : [];
 
   // Payment methods distribution
   const paymentMethods = filteredSales.reduce((acc, sale) => {
@@ -137,7 +139,10 @@ export default function ReportsView() {
           </SelectContent>
         </Select>
         
-        <DateRangePicker value={dateRange} onChange={setDateRange} />
+        <DateRangePicker
+          date={dateRange}
+          onDateChange={setDateRange}
+        />
       </div>
 
       {/* KPIs */}

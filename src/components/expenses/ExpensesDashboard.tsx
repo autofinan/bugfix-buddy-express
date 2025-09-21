@@ -7,6 +7,7 @@ import { Plus, Search, Calendar, TrendingDown } from "lucide-react";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { DateRange } from "react-day-picker";
 
 // Mock data - replace with actual hook when expenses table is available
 const mockExpenses = [
@@ -30,7 +31,7 @@ const mockExpenses = [
 
 export default function ExpensesDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   
   // TODO: Replace with actual useExpenses hook
   const expenses = mockExpenses;
@@ -101,10 +102,10 @@ export default function ExpensesDashboard() {
               className="pl-10"
             />
           </div>
-          <DateRangePicker
-            value={dateRange}
-            onChange={setDateRange}
-          />
+        <DateRangePicker
+          date={dateRange}
+          onDateChange={setDateRange}
+        />
         </div>
 
         {isLoading ? (
