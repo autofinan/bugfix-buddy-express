@@ -3,39 +3,37 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Calendar, TrendingDown } from "lucide-react";
+import { Plus, Search, Calendar, TrendingDown, Edit, Trash2 } from "lucide-react";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { ExpenseForm } from "./ExpenseForm";
+import { useExpenses, useDeleteExpense } from "@/hooks/useExpenses";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
 
-// Mock data - replace with actual hook when expenses table is available
-const mockExpenses = [
-  {
-    id: "1",
-    description: "Compra de produtos",
-    amount: 500.00,
-    category: "Produtos",
-    expense_date: "2024-01-15",
-    payment_method: "PIX"
-  },
-  {
-    id: "2", 
-    description: "Aluguel do estabelecimento",
-    amount: 1200.00,
-    category: "Aluguel",
-    expense_date: "2024-01-01",
-    payment_method: "Transferência"
-  }
-];
-
 export default function ExpensesDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [showForm, setShowForm] = useState(false);
+  const [editingExpense, setEditingExpense] = useState(null);
   
-  // TODO: Replace with actual useExpenses hook
-  const expenses = mockExpenses;
-  const isLoading = false;
+  const { data: expenses = [], isLoading, refetch } = useExpenses(
+    searchTerm,
+    dateRange?.from,
+    dateRange?.to
+  );
+  const deleteExpense = useDeleteExpense();
 
   const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
 
@@ -51,7 +49,7 @@ export default function ExpensesDashboard() {
           <h1 className="text-3xl font-bold">Despesas</h1>
           <p className="text-muted-foreground">Controle suas despesas e gastos</p>
         </div>
-        <Button className="gap-2">
+        <Button className="gap-2" onClick={() => setShowForm(true)}>
           <Plus className="h-4 w-4" />
           Nova Despesa
         </Button>
@@ -114,10 +112,10 @@ export default function ExpensesDashboard() {
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredExpenses.map((expense) => (
+            {expenses.map((expense) => (
               <Card key={expense.id} className="p-4">
                 <div className="flex items-center justify-between">
-                  <div className="space-y-1">
+                  <div className="space-y-1 flex-1">
                     <p className="font-medium">{expense.description}</p>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline">{expense.category}</Badge>
@@ -130,14 +128,60 @@ export default function ExpensesDashboard() {
                     </p>
                   </div>
                   
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-red-600">- R$ {expense.amount.toFixed(2)}</p>
+                  <div className="text-right flex items-center gap-2">
+                    <div>
+                      <p className="text-lg font-bold text-red-600">- R$ {expense.amount.toFixed(2)}</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditingExpense(expense);
+                          setShowForm(true);
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive hover:text-destructive-foreground hover:bg-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Tem certeza que deseja excluir esta despesa? Esta ação não pode ser desfeita.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => {
+                                deleteExpense.mutate(expense.id);
+                                refetch();
+                              }}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </div>
                 </div>
               </Card>
             ))}
             
-            {filteredExpenses.length === 0 && (
+            {expenses.length === 0 && !isLoading && (
               <div className="text-center py-8">
                 <p className="text-muted-foreground">Nenhuma despesa encontrada</p>
               </div>
@@ -145,6 +189,21 @@ export default function ExpensesDashboard() {
           </div>
         )}
       </Card>
+
+      <ExpenseForm
+        open={showForm}
+        onOpenChange={setShowForm}
+        expense={editingExpense}
+        onClose={() => {
+          setShowForm(false);
+          setEditingExpense(null);
+        }}
+        onSuccess={() => {
+          refetch();
+          setShowForm(false);
+          setEditingExpense(null);
+        }}
+      />
     </div>
   );
 }

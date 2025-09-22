@@ -18,13 +18,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { BudgetForm } from './BudgetForm';
+import { BudgetDetailsModal } from './BudgetDetailsModal';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const BudgetsView = () => {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
-  const { data: budgets, isLoading, error } = useBudgets(searchTerm);
+  const [showForm, setShowForm] = useState(false);
+  const [editingBudget, setEditingBudget] = useState(null);
+  const [viewingBudgetId, setViewingBudgetId] = useState<string | null>(null);
+  const { data: budgets, isLoading, error, refetch } = useBudgets(searchTerm);
   const deleteBudget = useDeleteBudget();
 
   if (!user) {
@@ -91,7 +96,7 @@ const BudgetsView = () => {
             Gerencie seus orçamentos de forma segura
           </p>
         </div>
-        <Button>
+        <Button onClick={() => setShowForm(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Novo Orçamento
         </Button>
@@ -147,7 +152,7 @@ const BudgetsView = () => {
                   : 'Você ainda não criou nenhum orçamento.'
                 }
               </p>
-              <Button>
+              <Button onClick={() => setShowForm(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Criar Primeiro Orçamento
               </Button>
@@ -210,6 +215,7 @@ const BudgetsView = () => {
                       variant="outline"
                       size="sm"
                       title="Ver detalhes"
+                      onClick={() => setViewingBudgetId(budget.id)}
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -219,6 +225,10 @@ const BudgetsView = () => {
                         variant="outline"
                         size="sm"
                         title="Editar"
+                        onClick={() => {
+                          setEditingBudget(budget);
+                          setShowForm(true);
+                        }}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -249,8 +259,11 @@ const BudgetsView = () => {
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => deleteBudget.mutate(budget.id)}
+          <AlertDialogAction
+                            onClick={() => {
+                              deleteBudget.mutate(budget.id);
+                              refetch();
+                            }}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                           >
                             Excluir
@@ -273,6 +286,36 @@ const BudgetsView = () => {
           Apenas proprietários podem ver informações completas do cliente.
         </div>
       )}
+
+      <BudgetForm
+        open={showForm}
+        onOpenChange={setShowForm}
+        budget={editingBudget}
+        onClose={() => {
+          setShowForm(false);
+          setEditingBudget(null);
+        }}
+        onSuccess={() => {
+          refetch();
+          setShowForm(false);
+          setEditingBudget(null);
+        }}
+      />
+
+      <BudgetDetailsModal
+        budgetId={viewingBudgetId}
+        open={!!viewingBudgetId}
+        onOpenChange={(open) => !open && setViewingBudgetId(null)}
+        onEdit={() => {
+          const budget = budgets?.find(b => b.id === viewingBudgetId);
+          if (budget) {
+            setEditingBudget(budget);
+            setShowForm(true);
+            setViewingBudgetId(null);
+          }
+        }}
+        onRefresh={refetch}
+      />
     </div>
   );
 };

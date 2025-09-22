@@ -14,8 +14,10 @@ import { DateRange } from "react-day-picker";
 export default function SalesView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [viewingSaleId, setViewingSaleId] = useState<string | null>(null);
   
-  const { data: sales = [], isLoading } = useSales(dateRange?.from, dateRange?.to, searchTerm);
+  const { data: sales = [], isLoading, refetch } = useSales(dateRange?.from, dateRange?.to, searchTerm);
+  const cancelSale = useCancelSale();
 
   const totalSales = sales.reduce((sum, sale) => sum + sale.total, 0);
   const totalProfit = sales.reduce((sum, sale) => sum + (sale.total_profit || 0), 0);
@@ -124,6 +126,12 @@ export default function SalesView() {
           </div>
         )}
       </Card>
+
+      <SaleDetailsModal
+        saleId={viewingSaleId}
+        open={!!viewingSaleId}
+        onOpenChange={(open) => !open && setViewingSaleId(null)}
+      />
     </div>
   );
 }
