@@ -198,9 +198,11 @@ export function BudgetForm({ open, onOpenChange, budget, onClose, onSuccess }: B
             <div className="space-y-3">
               <div>
                 <Label htmlFor="valid-until">Válido até</Label>
-                <DatePicker
-                  date={validUntil}
-                  onDateChange={setValidUntil}
+                <Input
+                  id="valid-until"
+                  type="date"
+                  value={validUntil ? validUntil.toISOString().split('T')[0] : ''}
+                  onChange={(e) => setValidUntil(e.target.value ? new Date(e.target.value) : undefined)}
                 />
               </div>
               <div>

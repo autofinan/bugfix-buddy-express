@@ -75,9 +75,15 @@ export const useCreateExpense = () => {
 
   return useMutation({
     mutationFn: async (expenseData: Omit<Expense, 'id' | 'created_at' | 'updated_at' | 'owner_id'>) => {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) throw new Error('User not authenticated');
+
       const { data, error } = await supabase
         .from('expenses')
-        .insert(expenseData)
+        .insert({
+          ...expenseData,
+          owner_id: user.user.id,
+        })
         .select()
         .single();
 

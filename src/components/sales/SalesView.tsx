@@ -4,11 +4,11 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Search, Calendar, DollarSign, FileText } from "lucide-react";
-import { useSales } from "@/hooks/useSales";
+import { useSales, useCancelSale } from "@/hooks/useSales";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-
+import { SaleDetailsModal } from "@/components/sales/SaleDetailsModal";
 import { DateRange } from "react-day-picker";
 
 export default function SalesView() {

@@ -93,12 +93,16 @@ export function ExpenseForm({ open, onOpenChange, expense, onClose, onSuccess }:
     try {
       setLoading(true);
 
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) throw new Error('User not authenticated');
+
       const expenseData = {
         description: description.trim(),
         amount: amountValue,
         category,
         payment_method: paymentMethod,
         expense_date: expenseDate,
+        owner_id: user.user.id,
       };
 
       if (expense) {
