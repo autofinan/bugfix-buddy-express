@@ -8,7 +8,7 @@ import { Plus, Search, Eye, FileText, CheckCircle, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { BudgetForm } from "./BudgetForm";
-import { BudgetDetails } from "./BudgetDetails";
+import { BudgetDetailsModal } from "./BudgetDetailsModal";
 import { ConvertBudgetModal } from "./ConvertBudgetModal";
 import { generateBudgetPDF } from "@/utils/pdfUtils";
 
@@ -493,7 +493,7 @@ export default function BudgetsView() {
       )}
 
       {showDetails && selectedBudget && (
-        <BudgetDetails
+        <BudgetDetailsModal
           budget={selectedBudget}
           open={showDetails}
           onOpenChange={setShowDetails}
