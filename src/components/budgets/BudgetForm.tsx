@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Minus, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { validateCustomerData } from "@/utils/inputValidation";
 
 interface Product {
   id: string;
@@ -137,6 +138,22 @@ export function BudgetForm({ open, onOpenChange, onSave }: BudgetFormProps) {
       return;
     }
 
+    // SEGURANÇA: Validar dados do cliente antes de salvar
+    const validation = validateCustomerData({
+      customer_name: customerName,
+      customer_email: customerEmail,
+      customer_phone: customerPhone,
+    });
+
+    if (!validation.success) {
+      toast({
+        title: "Dados inválidos",
+        description: validation.errors,
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -147,13 +164,13 @@ export function BudgetForm({ open, onOpenChange, onSave }: BudgetFormProps) {
       const discount = calculateDiscount();
       const total = calculateTotal();
 
-      // Criar orçamento 
+      // Criar orçamento com dados validados
       const { data: budget, error: budgetError } = await supabase
         .from("budgets")
         .insert({
-          customer_name: customerName || null,
-          customer_email: customerEmail || null,
-          customer_phone: customerPhone || null,
+          customer_name: validation.data.customer_name,
+          customer_email: validation.data.customer_email,
+          customer_phone: validation.data.customer_phone,
           subtotal,
           discount_type: discountValue > 0 ? discountType : null,
           discount_value: discountValue,

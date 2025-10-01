@@ -49,63 +49,31 @@ export default function BudgetsView() {
   const fetchBudgets = async () => {
     setLoading(true);
     try {
-      // SEGURANÇA: Buscar dados dos orçamentos sem informações sensíveis do cliente
+      // SEGURANÇA: RLS garante que apenas orçamentos do owner são retornados
       const { data, error } = await supabase
         .from("budgets")
-        .select(`
-          id,
-          subtotal,
-          discount_type,
-          discount_value,
-          total,
-          status,
-          notes,
-          valid_until,
-          created_at,
-          updated_at,
-          converted_sale_id,
-          canceled_at,
-          cancel_reason,
-          canceled_by,
-          owner_id
-        `)
+        .select("*")
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       
-      // Buscar informações protegidas do cliente para cada orçamento
-      const budgetsWithCustomerData: Budget[] = await Promise.all(
-        (data || []).map(async (budget): Promise<Budget> => {
-          const { data: protectedData, error: protectedError } = await supabase
-            .rpc('get_budget_with_protected_customer_data', { budget_id_param: budget.id });
-          
-          if (protectedError) {
-            console.error(`Erro ao buscar dados protegidos do orçamento ${budget.id}:`, protectedError);
-            // Retornar dados básicos sem informações do cliente em caso de erro
-            return {
-              ...budget,
-              customer_name: null,
-              customer_email: null,
-              customer_phone: null,
-            } as Budget;
-          }
-          
-          const customerData = protectedData?.[0];
-          return {
-            ...budget,
-            customer_name: customerData?.customer_name || null,
-            customer_email: customerData?.customer_email || null,
-            customer_phone: customerData?.customer_phone || null,
-          } as Budget;
-        })
-      );
+      // SEGURANÇA: Mascarar dados sensíveis do cliente na listagem
+      const budgets: Budget[] = (data || []).map((budget) => ({
+        ...budget,
+        // Mostrar apenas primeiras letras do nome
+        customer_name: budget.customer_name 
+          ? budget.customer_name.substring(0, 3) + "***" 
+          : null,
+        // Mascarar email
+        customer_email: budget.customer_email 
+          ? "***@" + budget.customer_email.split("@")[1]
+          : null,
+        // Mascarar telefone
+        customer_phone: budget.customer_phone ? "***-***-****" : null,
+      }));
       
-      // Log de auditoria: registrar acesso aos dados usando função segura
-      console.log(`Acesso seguro a ${budgetsWithCustomerData.length} orçamentos via função protegida`);
-      
-      setBudgets(budgetsWithCustomerData);
+      setBudgets(budgets);
     } catch (error) {
-      console.error("Erro ao buscar orçamentos:", error);
       toast({
         title: "Erro",
         description: "Erro ao carregar orçamentos",
@@ -122,9 +90,7 @@ export default function BudgetsView() {
     setConvertingBudgets(prev => new Set(prev).add(budgetToConvert.id));
     
     try {
-      console.log('🔄 Iniciando conversão de orçamento para venda:', budgetToConvert.id);
-      
-      // Verificar se o usuário está autenticado
+      // SEGURANÇA: Verificar autenticação antes de conversão
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) {
         throw new Error('Usuário não autenticado');
@@ -204,8 +170,6 @@ export default function BudgetsView() {
         .eq("id", budgetToConvert.id);
 
       if (updateError) throw updateError;
-
-      console.log('✅ Venda criada com ID:', sale.id);
       
       toast({
         title: "Sucesso! 🎉",
@@ -216,8 +180,6 @@ export default function BudgetsView() {
       setBudgetToConvert(null);
       fetchBudgets();
     } catch (error: any) {
-      console.error("❌ Erro detalhado ao converter orçamento:", error);
-      
       let errorMessage = "Erro ao converter orçamento";
       if (error.message) {
         if (error.message.includes('not found')) {
@@ -276,8 +238,19 @@ export default function BudgetsView() {
     setGeneratingPdfs(prev => new Set(prev).add(budget.id));
     
     try {
-      console.log("Iniciando geração de PDF para orçamento:", budget.id);
-      const result = await generateBudgetPDF(budget);
+      // SEGURANÇA: Buscar dados completos do orçamento (RLS garante permissão)
+      const { data: fullBudget, error } = await supabase
+        .from("budgets")
+        .select("*")
+        .eq("id", budget.id)
+        .single();
+      
+      if (error) throw error;
+      if (!fullBudget) {
+        throw new Error("Orçamento não encontrado ou sem permissão");
+      }
+
+      const result = await generateBudgetPDF(fullBudget);
       
       if (result !== false) {
         toast({
@@ -288,7 +261,6 @@ export default function BudgetsView() {
         throw new Error("Falha na geração do PDF");
       }
     } catch (error) {
-      console.error("Erro ao gerar PDF:", error);
       toast({
         title: "❌ Erro",
         description: error instanceof Error ? error.message : "Erro ao gerar PDF do orçamento",
@@ -317,12 +289,10 @@ export default function BudgetsView() {
   };
 
   const filteredBudgets = budgets.filter(budget => {
-    // SEGURANÇA: Busca apenas se dados não estão protegidos/mascarados
+    // SEGURANÇA: Busca apenas em dados não sensíveis (ID e notas)
     const matchesSearch = !searchTerm || 
-      (budget.customer_name && 
-       budget.customer_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (budget.customer_email && 
-       budget.customer_email.toLowerCase().includes(searchTerm.toLowerCase()));
+      budget.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (budget.notes && budget.notes.toLowerCase().includes(searchTerm.toLowerCase()));
     
     const matchesStatus = statusFilter === "all" || budget.status === statusFilter;
     
