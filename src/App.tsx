@@ -1,4 +1,4 @@
-// src/App.tsx
+// src/App.tsx - Sistema de Gestão de Vendas
 
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
