@@ -266,6 +266,36 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_data_access_log: {
+        Row: {
+          access_type: string
+          accessed_at: string | null
+          budget_id: string
+          id: string
+          ip_address: unknown | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          access_type: string
+          accessed_at?: string | null
+          budget_id: string
+          id?: string
+          ip_address?: unknown | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          access_type?: string
+          accessed_at?: string | null
+          budget_id?: string
+          id?: string
+          ip_address?: unknown | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           amount: number
@@ -339,6 +369,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payment_fees: {
+        Row: {
+          created_at: string | null
+          fee_percentage: number
+          id: string
+          installments: number | null
+          method: string
+          owner_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          fee_percentage?: number
+          id?: string
+          installments?: number | null
+          method: string
+          owner_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          fee_percentage?: number
+          id?: string
+          installments?: number | null
+          method?: string
+          owner_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       products: {
         Row: {
@@ -486,14 +546,20 @@ export type Database = {
           canceled: boolean | null
           canceled_at: string | null
           canceled_by: string | null
+          cliente_id: string | null
+          cliente_nome: string | null
           created_at: string
           date: string
           discount_type: string | null
           discount_value: number | null
+          gross_amount: number | null
           id: string
+          installments: number | null
+          net_amount: number | null
           note: string | null
           owner_id: string | null
           payment_method: string
+          status: string | null
           subtotal: number | null
           total: number
         }
@@ -502,14 +568,20 @@ export type Database = {
           canceled?: boolean | null
           canceled_at?: string | null
           canceled_by?: string | null
+          cliente_id?: string | null
+          cliente_nome?: string | null
           created_at?: string
           date?: string
           discount_type?: string | null
           discount_value?: number | null
+          gross_amount?: number | null
           id?: string
+          installments?: number | null
+          net_amount?: number | null
           note?: string | null
           owner_id?: string | null
           payment_method: string
+          status?: string | null
           subtotal?: number | null
           total: number
         }
@@ -518,18 +590,39 @@ export type Database = {
           canceled?: boolean | null
           canceled_at?: string | null
           canceled_by?: string | null
+          cliente_id?: string | null
+          cliente_nome?: string | null
           created_at?: string
           date?: string
           discount_type?: string | null
           discount_value?: number | null
+          gross_amount?: number | null
           id?: string
+          installments?: number | null
+          net_amount?: number | null
           note?: string | null
           owner_id?: string | null
           payment_method?: string
+          status?: string | null
           subtotal?: number | null
           total?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       user_discount_limits: {
         Row: {
@@ -571,6 +664,26 @@ export type Database = {
         Args: { budget_id_param: string }
         Returns: string
       }
+      get_budget_details_secure: {
+        Args: { budget_id_param: string }
+        Returns: {
+          converted_sale_id: string
+          created_at: string
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          discount_type: string
+          discount_value: number
+          id: string
+          notes: string
+          owner_id: string
+          status: Database["public"]["Enums"]["budget_status"]
+          subtotal: number
+          total: number
+          updated_at: string
+          valid_until: string
+        }[]
+      }
       get_budget_with_protected_customer_data: {
         Args: { budget_id_param: string }
         Returns: {
@@ -584,6 +697,31 @@ export type Database = {
           customer_phone: string
           discount_type: string
           discount_value: number
+          id: string
+          notes: string
+          owner_id: string
+          status: Database["public"]["Enums"]["budget_status"]
+          subtotal: number
+          total: number
+          updated_at: string
+          valid_until: string
+        }[]
+      }
+      get_budgets_secure: {
+        Args: {
+          limit_count?: number
+          offset_count?: number
+          search_term?: string
+        }
+        Returns: {
+          converted_sale_id: string
+          created_at: string
+          customer_email_masked: string
+          customer_name_masked: string
+          customer_phone_masked: string
+          discount_type: string
+          discount_value: number
+          has_customer_info: boolean
           id: string
           notes: string
           owner_id: string
@@ -613,6 +751,19 @@ export type Database = {
           total: number
           total_profit: number
           total_revenue: number
+        }[]
+      }
+      mask_customer_data: {
+        Args: {
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          is_owner: boolean
+        }
+        Returns: {
+          masked_email: string
+          masked_name: string
+          masked_phone: string
         }[]
       }
       search_budgets_safe: {

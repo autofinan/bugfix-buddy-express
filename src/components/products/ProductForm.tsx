@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Product } from "./ProductsView";
+import { Upload, X, Image as ImageIcon } from "lucide-react";
 
 interface Category {
   id: string;
@@ -26,6 +27,9 @@ interface ProductFormProps {
 export function ProductForm({ open, onOpenChange, product, onSave, onClose }: ProductFormProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -58,6 +62,7 @@ export function ProductForm({ open, onOpenChange, product, onSave, onClose }: Pr
           image_url: product.image_url || "",
           is_active: product.is_active,
         });
+        setImagePreview(product.image_url || "");
       } else {
         setFormData({
           name: "",
@@ -72,7 +77,9 @@ export function ProductForm({ open, onOpenChange, product, onSave, onClose }: Pr
           image_url: "",
           is_active: true,
         });
+        setImagePreview("");
       }
+      setImageFile(null);
     }
   }, [open, product]);
 
@@ -87,6 +94,69 @@ export function ProductForm({ open, onOpenChange, product, onSave, onClose }: Pr
       setCategories(data || []);
     } catch (error) {
       console.error("Erro ao carregar categorias:", error);
+    }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "Erro",
+          description: "A imagem deve ter no máximo 5MB",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview("");
+    setFormData({ ...formData, image_url: "" });
+  };
+
+  const uploadImage = async (): Promise<string | null> => {
+    if (!imageFile) return formData.image_url || null;
+
+    try {
+      setUploading(true);
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError, data } = await supabase.storage
+        .from('product-images')
+        .upload(filePath, imageFile, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error: any) {
+      console.error("Erro ao fazer upload:", error);
+      toast({
+        title: "Erro no upload",
+        description: error.message || "Erro ao enviar imagem",
+        variant: "destructive"
+      });
+      return null;
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -105,6 +175,9 @@ export function ProductForm({ open, onOpenChange, product, onSave, onClose }: Pr
     try {
       setLoading(true);
       
+      // Upload da imagem se houver
+      const uploadedImageUrl = await uploadImage();
+      
       const productData = {
         name: formData.name.trim(),
         description: formData.description.trim() || null,
@@ -115,7 +188,7 @@ export function ProductForm({ open, onOpenChange, product, onSave, onClose }: Pr
         sku: formData.sku.trim() || null,
         barcode: formData.barcode.trim() || null,
         category_id: formData.category_id || null,
-        image_url: formData.image_url.trim() || null,
+        image_url: uploadedImageUrl || null,
         is_active: formData.is_active,
       };
 
@@ -280,12 +353,58 @@ export function ProductForm({ open, onOpenChange, product, onSave, onClose }: Pr
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="image_url">URL da Imagem</Label>
+            <Label>Imagem do Produto</Label>
+            
+            {imagePreview ? (
+              <div className="relative w-full h-48 border-2 border-dashed rounded-lg overflow-hidden">
+                <img 
+                  src={imagePreview} 
+                  alt="Preview" 
+                  className="w-full h-full object-contain bg-muted"
+                />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  className="absolute top-2 right-2"
+                  onClick={handleRemoveImage}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
+                <input
+                  type="file"
+                  id="image-upload"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+                <label htmlFor="image-upload" className="cursor-pointer flex flex-col items-center gap-2">
+                  <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                    <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Clique para fazer upload</p>
+                    <p className="text-sm text-muted-foreground">PNG, JPG, WEBP até 5MB</p>
+                  </div>
+                </label>
+              </div>
+            )}
+            
+            <div className="text-xs text-muted-foreground">
+              Ou insira a URL de uma imagem existente:
+            </div>
             <Input
               id="image_url"
               type="url"
+              placeholder="https://exemplo.com/imagem.jpg"
               value={formData.image_url}
-              onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, image_url: e.target.value });
+                setImagePreview(e.target.value);
+              }}
             />
           </div>
 
@@ -299,11 +418,11 @@ export function ProductForm({ open, onOpenChange, product, onSave, onClose }: Pr
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={loading || uploading}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Salvando..." : product ? "Atualizar" : "Criar"}
+            <Button type="submit" disabled={loading || uploading}>
+              {uploading ? "Enviando imagem..." : loading ? "Salvando..." : product ? "Atualizar" : "Criar"}
             </Button>
           </div>
         </form>
