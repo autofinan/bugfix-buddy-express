@@ -1,9 +1,12 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useSaleItems } from "@/hooks/useSales";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Separator } from "@/components/ui/separator";
 
 interface Sale {
   id: string;
@@ -28,6 +31,36 @@ interface SaleDetailsModalProps {
 
 export function SaleDetailsModal({ sale, open, onOpenChange }: SaleDetailsModalProps) {
   const { data: items, isLoading } = useSaleItems(sale?.id || "");
+  
+  // Buscar movimentações de estoque relacionadas à venda
+  const { data: inventoryMovements } = useQuery({
+    queryKey: ["inventory-movements", sale?.id],
+    queryFn: async () => {
+      if (!sale?.id) return [];
+      
+      const { data, error } = await supabase
+        .from("inventory_movements")
+        .select(`
+          *,
+          products (
+            name,
+            sku
+          )
+        `)
+        .eq("type", "out")
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      
+      // Filtrar movimentos que correspondem aos itens desta venda
+      const saleItemIds = items?.map(item => item.product_id) || [];
+      return data?.filter(movement => 
+        saleItemIds.includes(movement.product_id) &&
+        new Date(movement.created_at).toDateString() === new Date(sale.date).toDateString()
+      ) || [];
+    },
+    enabled: !!sale?.id && !!items,
+  });
 
   if (!sale) return null;
 
@@ -41,7 +74,7 @@ export function SaleDetailsModal({ sale, open, onOpenChange }: SaleDetailsModalP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Detalhes da Venda</span>
@@ -49,6 +82,9 @@ export function SaleDetailsModal({ sale, open, onOpenChange }: SaleDetailsModalP
               <Badge variant="destructive">Cancelada</Badge>
             )}
           </DialogTitle>
+          <DialogDescription>
+            Informações completas sobre esta transação
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -166,12 +202,61 @@ export function SaleDetailsModal({ sale, open, onOpenChange }: SaleDetailsModalP
             </div>
           )}
 
+          {/* Movimentações de Estoque */}
+          {inventoryMovements && inventoryMovements.length > 0 && (
+            <div>
+              <Separator className="my-4" />
+              <h3 className="font-semibold mb-3">Movimentações de Estoque</h3>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Produto</TableHead>
+                    <TableHead>SKU</TableHead>
+                    <TableHead className="text-right">Quantidade</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Data/Hora</TableHead>
+                    <TableHead>Motivo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {inventoryMovements.map((movement: any) => (
+                    <TableRow key={movement.id}>
+                      <TableCell className="font-medium">
+                        {movement.products?.name || "Produto não encontrado"}
+                      </TableCell>
+                      <TableCell>
+                        {movement.products?.sku || "-"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="text-destructive font-mono">
+                          -{movement.quantity}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">Saída</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {format(new Date(movement.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {movement.reason || "Venda"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
           {/* Informações de Cancelamento */}
           {sale.canceled && sale.cancel_reason && (
-            <div className="bg-destructive/10 p-4 rounded-md">
-              <p className="text-sm font-semibold text-destructive mb-1">Motivo do Cancelamento</p>
-              <p className="text-sm">{sale.cancel_reason}</p>
-            </div>
+            <>
+              <Separator className="my-4" />
+              <div className="bg-destructive/10 p-4 rounded-md">
+                <p className="text-sm font-semibold text-destructive mb-1">Motivo do Cancelamento</p>
+                <p className="text-sm">{sale.cancel_reason}</p>
+              </div>
+            </>
           )}
         </div>
       </DialogContent>

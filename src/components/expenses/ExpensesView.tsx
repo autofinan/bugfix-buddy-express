@@ -24,7 +24,13 @@ interface Expense {
   created_at: string;
 }
 
-const categories = ["Aluguel", "Compras", "Contas", "Marketing", "Outros"];
+const categories = ["Aluguel", "Salário", "Luz", "Água", "Impostos", "Outros"];
+const paymentMethods = [
+  { value: "all", label: "Todos os métodos" },
+  { value: "dinheiro", label: "Dinheiro" },
+  { value: "pix", label: "PIX" },
+  { value: "cartao", label: "Cartão" }
+];
 
 export function ExpensesView() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -33,6 +39,7 @@ export function ExpensesView() {
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("all");
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const { toast } = useToast();
 
@@ -96,8 +103,9 @@ export function ExpensesView() {
     const matchesSearch = !searchTerm || 
       expense.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === "all" || expense.category === categoryFilter;
+    const matchesPaymentMethod = paymentMethodFilter === "all" || expense.payment_method === paymentMethodFilter;
     
-    return matchesSearch && matchesCategory;
+    return matchesSearch && matchesCategory && matchesPaymentMethod;
   });
 
   const totalExpenses = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
@@ -149,6 +157,19 @@ export function ExpensesView() {
             {categories.map((category) => (
               <SelectItem key={category} value={category}>
                 {category}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={paymentMethodFilter} onValueChange={setPaymentMethodFilter}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Filtrar por método" />
+          </SelectTrigger>
+          <SelectContent>
+            {paymentMethods.map((method) => (
+              <SelectItem key={method.value} value={method.value}>
+                {method.label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -214,7 +235,12 @@ export function ExpensesView() {
                       R$ {expense.amount.toFixed(2)}
                     </TableCell>
                     <TableCell>
-                      {expense.payment_method || "-"}
+                      <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium">
+                        {expense.payment_method === "dinheiro" && "Dinheiro"}
+                        {expense.payment_method === "pix" && "PIX"}
+                        {expense.payment_method === "cartao" && "Cartão"}
+                        {!expense.payment_method && "-"}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">

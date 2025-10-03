@@ -23,41 +23,101 @@ interface ExpenseFormProps {
 
 const categories = [
   "Aluguel",
-  "Compras", 
-  "Contas",
-  "Marketing",
+  "Salário",
+  "Luz",
+  "Água",
+  "Impostos",
   "Outros"
 ];
 
 const paymentMethods = [
-  "Dinheiro",
-  "PIX",
-  "Cartão de Débito",
-  "Cartão de Crédito",
-  "Transferência",
-  "Boleto"
+  { value: "dinheiro", label: "Dinheiro" },
+  { value: "pix", label: "PIX" },
+  { value: "cartao", label: "Cartão" }
 ];
+
+// Função para normalizar métodos de pagamento
+const normalizePaymentMethod = (value: string): string => {
+  const normalized = value.toLowerCase().trim();
+  
+  if (["dinheiro", "cash", "espécie", "especie"].includes(normalized)) {
+    return "dinheiro";
+  }
+  if (["pix"].includes(normalized)) {
+    return "pix";
+  }
+  if (["cartao", "cartão", "credito", "crédito", "debito", "débito", "card"].includes(normalized)) {
+    return "cartao";
+  }
+  
+  return "dinheiro"; // fallback
+};
 
 export function ExpenseForm({ open, onOpenChange, onSave, expense }: ExpenseFormProps) {
   const [description, setDescription] = useState(expense?.description || "");
   const [category, setCategory] = useState(expense?.category || "");
-  const [amount, setAmount] = useState(expense?.amount || "");
+  const [amount, setAmount] = useState(expense?.amount?.toString() || "");
   const [expenseDate, setExpenseDate] = useState<Date>(expense?.expense_date ? new Date(expense.expense_date) : new Date());
-  const [paymentMethod, setPaymentMethod] = useState(expense?.payment_method || "");
+  const [paymentMethod, setPaymentMethod] = useState(expense?.payment_method ? normalizePaymentMethod(expense.payment_method) : "");
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const { toast } = useToast();
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!description.trim()) {
+      newErrors.description = "Descrição é obrigatória";
+    }
+
+    if (!category) {
+      newErrors.category = "Categoria é obrigatória";
+    }
+
+    if (!amount || parseFloat(amount) <= 0) {
+      newErrors.amount = "Valor deve ser maior que zero";
+    }
+
+    if (!expenseDate) {
+      newErrors.expenseDate = "Data é obrigatória";
+    }
+
+    if (!paymentMethod) {
+      newErrors.paymentMethod = "Método de pagamento é obrigatório";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      toast({
+        title: "Erro de validação",
+        description: "Por favor, preencha todos os campos obrigatórios corretamente.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
+      // Normalizar o valor (aceita vírgula e converte para ponto)
+      const normalizedAmount = parseFloat(amount.replace(',', '.'));
+
+      if (isNaN(normalizedAmount) || normalizedAmount <= 0) {
+        throw new Error("Valor inválido");
+      }
+
       const expenseData = {
-        description,
+        description: description.trim(),
         category,
-        amount: parseFloat(amount),
+        amount: normalizedAmount,
         expense_date: format(expenseDate, 'yyyy-MM-dd'),
-        payment_method: paymentMethod || null,
+        payment_method: normalizePaymentMethod(paymentMethod),
         owner_id: (await supabase.auth.getUser()).data.user?.id,
       };
 
@@ -95,11 +155,12 @@ export function ExpenseForm({ open, onOpenChange, onSave, expense }: ExpenseForm
       setAmount("");
       setExpenseDate(new Date());
       setPaymentMethod("");
-    } catch (error) {
+      setErrors({});
+    } catch (error: any) {
       console.error("Erro ao salvar despesa:", error);
       toast({
         title: "Erro",
-        description: "Erro ao salvar despesa",
+        description: error.message || "Erro ao salvar despesa",
         variant: "destructive"
       });
     } finally {
@@ -118,7 +179,7 @@ export function ExpenseForm({ open, onOpenChange, onSave, expense }: ExpenseForm
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="description">Descrição</Label>
+            <Label htmlFor="description">Descrição *</Label>
             <Textarea
               id="description"
               value={description}
@@ -126,10 +187,13 @@ export function ExpenseForm({ open, onOpenChange, onSave, expense }: ExpenseForm
               placeholder="Descreva a despesa..."
               required
             />
+            {errors.description && (
+              <p className="text-sm text-destructive">{errors.description}</p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="category">Categoria</Label>
+            <Label htmlFor="category">Categoria *</Label>
             <Select value={category} onValueChange={setCategory} required>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione uma categoria" />
@@ -142,24 +206,31 @@ export function ExpenseForm({ open, onOpenChange, onSave, expense }: ExpenseForm
                 ))}
               </SelectContent>
             </Select>
+            {errors.category && (
+              <p className="text-sm text-destructive">{errors.category}</p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="amount">Valor</Label>
+            <Label htmlFor="amount">Valor (R$) *</Label>
             <Input
               id="amount"
-              type="number"
-              step="0.01"
-              min="0"
+              type="text"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder="0,00"
+              placeholder="100,50 ou 100.50"
               required
             />
+            {errors.amount && (
+              <p className="text-sm text-destructive">{errors.amount}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Use vírgula ou ponto para decimais
+            </p>
           </div>
 
           <div className="space-y-2">
-            <Label>Data da Despesa</Label>
+            <Label>Data da Despesa *</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -183,22 +254,28 @@ export function ExpenseForm({ open, onOpenChange, onSave, expense }: ExpenseForm
                 />
               </PopoverContent>
             </Popover>
+            {errors.expenseDate && (
+              <p className="text-sm text-destructive">{errors.expenseDate}</p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="paymentMethod">Forma de Pagamento (Opcional)</Label>
-            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+            <Label htmlFor="paymentMethod">Forma de Pagamento *</Label>
+            <Select value={paymentMethod} onValueChange={setPaymentMethod} required>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione uma forma de pagamento" />
               </SelectTrigger>
               <SelectContent>
                 {paymentMethods.map((method) => (
-                  <SelectItem key={method} value={method}>
-                    {method}
+                  <SelectItem key={method.value} value={method.value}>
+                    {method.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {errors.paymentMethod && (
+              <p className="text-sm text-destructive">{errors.paymentMethod}</p>
+            )}
           </div>
 
           <div className="flex gap-2 pt-4">
