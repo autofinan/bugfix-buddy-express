@@ -16,6 +16,8 @@ interface Sale {
   note: string | null;
   canceled: boolean;
   cancel_reason: string | null;
+  cliente_nome: string | null;
+  cliente_id: string | null;
 }
 
 interface SaleDetailsModalProps {
@@ -53,6 +55,10 @@ export function SaleDetailsModal({ sale, open, onOpenChange }: SaleDetailsModalP
           {/* Informações Gerais */}
           <div className="grid grid-cols-2 gap-4">
             <div>
+              <p className="text-sm text-muted-foreground">ID da Venda</p>
+              <p className="font-mono text-xs">{sale.id.substring(0, 8)}...</p>
+            </div>
+            <div>
               <p className="text-sm text-muted-foreground">Data</p>
               <p className="font-medium">
                 {format(new Date(sale.date), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
@@ -62,6 +68,12 @@ export function SaleDetailsModal({ sale, open, onOpenChange }: SaleDetailsModalP
               <p className="text-sm text-muted-foreground">Forma de Pagamento</p>
               <p className="font-medium">{sale.payment_method}</p>
             </div>
+            {sale.cliente_nome && (
+              <div>
+                <p className="text-sm text-muted-foreground">Cliente</p>
+                <p className="font-medium">{sale.cliente_nome}</p>
+              </div>
+            )}
           </div>
 
           {/* Produtos */}

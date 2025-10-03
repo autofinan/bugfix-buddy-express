@@ -17,6 +17,8 @@ export interface Sale {
   cancel_reason: string | null;
   canceled_by: string | null;
   owner_id: string;
+  cliente_nome: string | null;
+  cliente_id: string | null;
 }
 
 export interface SaleItem {

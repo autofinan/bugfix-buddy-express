@@ -49,7 +49,6 @@ export default function BudgetsView() {
   const fetchBudgets = async () => {
     setLoading(true);
     try {
-      // SEGURANÇA: RLS garante que apenas orçamentos do owner são retornados
       const { data, error } = await supabase
         .from("budgets")
         .select("*")
@@ -57,22 +56,7 @@ export default function BudgetsView() {
 
       if (error) throw error;
       
-      // SEGURANÇA: Mascarar dados sensíveis do cliente na listagem
-      const budgets: Budget[] = (data || []).map((budget) => ({
-        ...budget,
-        // Mostrar apenas primeiras letras do nome
-        customer_name: budget.customer_name 
-          ? budget.customer_name.substring(0, 3) + "***" 
-          : null,
-        // Mascarar email
-        customer_email: budget.customer_email 
-          ? "***@" + budget.customer_email.split("@")[1]
-          : null,
-        // Mascarar telefone
-        customer_phone: budget.customer_phone ? "***-***-****" : null,
-      }));
-      
-      setBudgets(budgets);
+      setBudgets(data || []);
     } catch (error) {
       toast({
         title: "Erro",
