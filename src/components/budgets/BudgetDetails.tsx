@@ -49,6 +49,7 @@ export function BudgetDetails({ budget, open, onOpenChange }: BudgetDetailsProps
 
   const fetchBudgetItems = async () => {
     try {
+      // SECURITY: Use RLS-protected query for budget items
       const { data, error } = await supabase
         .from("budget_items")
         .select(`
@@ -56,27 +57,26 @@ export function BudgetDetails({ budget, open, onOpenChange }: BudgetDetailsProps
           product_id,
           quantity,
           unit_price,
-          total_price
+          total_price,
+          products!inner (
+            name
+          )
         `)
         .eq("budget_id", budget.id);
 
       if (error) throw error;
 
-      // Buscar nomes dos produtos separadamente
-      const itemsWithProducts = await Promise.all(
-        (data || []).map(async (item) => {
-          const { data: productData } = await supabase
-            .from("products")
-            .select("name")
-            .eq("id", item.product_id)
-            .single();
-
-          return {
-            ...item,
-            products: { name: productData?.name || "Produto não encontrado" }
-          };
-        })
-      );
+      // Transform data to match expected structure
+      const itemsWithProducts = (data || []).map((item: any) => ({
+        id: item.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total_price: item.total_price,
+        products: {
+          name: item.products?.name || "Produto não encontrado"
+        }
+      }));
 
       setItems(itemsWithProducts);
     } catch (error) {
