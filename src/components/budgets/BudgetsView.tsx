@@ -49,11 +49,14 @@ export function BudgetsView() {
   const fetchBudgets = async () => {
     setLoading(true);
     try {
-      // SEGURANÇA: Buscar dados dos orçamentos sem informações sensíveis do cliente
+      // Buscar todos os orçamentos do usuário com RLS
       const { data, error } = await supabase
         .from("budgets")
         .select(`
           id,
+          customer_name,
+          customer_email,
+          customer_phone,
           subtotal,
           discount_type,
           discount_value,
@@ -73,37 +76,7 @@ export function BudgetsView() {
 
       if (error) throw error;
       
-      // Buscar informações protegidas do cliente para cada orçamento
-      const budgetsWithCustomerData: Budget[] = await Promise.all(
-        (data || []).map(async (budget): Promise<Budget> => {
-          const { data: protectedData, error: protectedError } = await supabase
-            .rpc('get_budget_with_protected_customer_data', { budget_id_param: budget.id });
-          
-          if (protectedError) {
-            console.error(`Erro ao buscar dados protegidos do orçamento ${budget.id}:`, protectedError);
-            // Retornar dados básicos sem informações do cliente em caso de erro
-            return {
-              ...budget,
-              customer_name: null,
-              customer_email: null,
-              customer_phone: null,
-            } as Budget;
-          }
-          
-          const customerData = protectedData?.[0];
-          return {
-            ...budget,
-            customer_name: customerData?.customer_name || null,
-            customer_email: customerData?.customer_email || null,
-            customer_phone: customerData?.customer_phone || null,
-          } as Budget;
-        })
-      );
-      
-      // Log de auditoria: registrar acesso aos dados usando função segura
-      console.log(`Acesso seguro a ${budgetsWithCustomerData.length} orçamentos via função protegida`);
-      
-      setBudgets(budgetsWithCustomerData);
+      setBudgets(data || []);
     } catch (error) {
       console.error("Erro ao buscar orçamentos:", error);
       toast({
