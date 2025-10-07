@@ -23,7 +23,7 @@ import ImportCSVPage from "./components/products/ImportCSVView";
 import POSPage from "./components/pos/POSView";
 
 // Orçamentos, despesas, vendas, relatórios, categorias, estoque
-import BudgetsPage from "./components/budgets/BudgetsView";
+import { BudgetsView as BudgetsPage } from "./components/budgets/BudgetsView";
 import ExpensesPage from "./components/expenses/ExpensesDashboard";
 import SalesPage from "./components/sales/SalesView";
 import ReportsPage from "./components/reports/ReportsView";
