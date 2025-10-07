@@ -49,29 +49,9 @@ export function BudgetsView() {
   const fetchBudgets = async () => {
     setLoading(true);
     try {
-      // Buscar todos os orçamentos do usuário com RLS
       const { data, error } = await supabase
         .from("budgets")
-        .select(`
-          id,
-          customer_name,
-          customer_email,
-          customer_phone,
-          subtotal,
-          discount_type,
-          discount_value,
-          total,
-          status,
-          notes,
-          valid_until,
-          created_at,
-          updated_at,
-          converted_sale_id,
-          canceled_at,
-          cancel_reason,
-          canceled_by,
-          owner_id
-        `)
+        .select("*")
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -290,12 +270,13 @@ export function BudgetsView() {
   };
 
   const filteredBudgets = budgets.filter(budget => {
-    // SEGURANÇA: Busca apenas se dados não estão protegidos/mascarados
     const matchesSearch = !searchTerm || 
       (budget.customer_name && 
        budget.customer_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (budget.customer_email && 
-       budget.customer_email.toLowerCase().includes(searchTerm.toLowerCase()));
+       budget.customer_email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (budget.notes && 
+       budget.notes.toLowerCase().includes(searchTerm.toLowerCase()));
     
     const matchesStatus = statusFilter === "all" || budget.status === statusFilter;
     
