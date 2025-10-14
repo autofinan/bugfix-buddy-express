@@ -20,6 +20,7 @@ export interface CartItem {
 export default function POSView() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showPayment, setShowPayment] = useState(false);
+  const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const { toast } = useToast();
 
   const addProductToCart = (product: { id: string; name: string; price: number; stock: number }) => {
@@ -40,6 +41,10 @@ export default function POSView() {
             : item
         );
       }
+      // Abrir drawer automaticamente ao adicionar primeiro item
+      if (current.length === 0) {
+        setCartDrawerOpen(true);
+      }
       return [...current, { ...product, quantity: 1, type: "produto" as const }];
     });
   };
@@ -53,6 +58,10 @@ export default function POSView() {
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
+      }
+      // Abrir drawer automaticamente ao adicionar primeiro item
+      if (current.length === 0) {
+        setCartDrawerOpen(true);
       }
       return [...current, { ...service, quantity: 1, type: "servico" as const }];
     });
@@ -109,15 +118,18 @@ export default function POSView() {
         <div>
           <h1 className="text-3xl font-bold">Ponto de Venda</h1>
         </div>
-        <div className="flex gap-2">
-          <CartDrawer
-            items={cart}
-            total={total}
-            onUpdateQuantity={updateQuantity}
-            onRemoveItem={removeFromCart}
-            onCheckout={() => setShowPayment(true)}
-          />
-        </div>
+        <CartDrawer
+          items={cart}
+          total={total}
+          onUpdateQuantity={updateQuantity}
+          onRemoveItem={removeFromCart}
+          onCheckout={() => {
+            setCartDrawerOpen(false);
+            setShowPayment(true);
+          }}
+          open={cartDrawerOpen}
+          onOpenChange={setCartDrawerOpen}
+        />
       </div>
 
       {/* Tabs para Produtos e Serviços */}

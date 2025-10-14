@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings as SettingsIcon } from "lucide-react";
 import { PaymentFeesSettings } from "@/components/settings/PaymentFeesSettings";
+import { GeneralSettings } from "@/components/settings/GeneralSettings";
 
 export default function Settings() {
   return (
@@ -16,21 +17,25 @@ export default function Settings() {
         </div>
       </div>
 
-      <Tabs defaultValue="fees" className="w-full">
+      <Tabs defaultValue="general" className="w-full">
         <TabsList>
+          <TabsTrigger value="general">Geral</TabsTrigger>
           <TabsTrigger value="fees">Taxas de Pagamento</TabsTrigger>
-          <TabsTrigger value="general" disabled>Geral (Em breve)</TabsTrigger>
           <TabsTrigger value="notifications" disabled>Notificações (Em breve)</TabsTrigger>
         </TabsList>
+        
+        <TabsContent value="general" className="mt-6">
+          <GeneralSettings />
+        </TabsContent>
         
         <TabsContent value="fees" className="mt-6">
           <PaymentFeesSettings />
         </TabsContent>
         
-        <TabsContent value="general">
+        <TabsContent value="notifications">
           <Card>
             <CardHeader>
-              <CardTitle>Configurações Gerais</CardTitle>
+              <CardTitle>Notificações</CardTitle>
               <CardDescription>Em desenvolvimento...</CardDescription>
             </CardHeader>
           </Card>

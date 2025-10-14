@@ -618,6 +618,44 @@ export type Database = {
           },
         ]
       }
+      sale_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          installments: number | null
+          owner_id: string | null
+          payment_method: string
+          sale_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          installments?: number | null
+          owner_id?: string | null
+          payment_method: string
+          sale_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          installments?: number | null
+          owner_id?: string | null
+          payment_method?: string
+          sale_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_payments_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales: {
         Row: {
           cancel_reason: string | null
@@ -740,6 +778,51 @@ export type Database = {
           notes?: string | null
           owner_id?: string
           price?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      store_settings: {
+        Row: {
+          accent_color: string | null
+          address: string | null
+          cnpj: string | null
+          created_at: string
+          id: string
+          logo_url: string | null
+          max_discount_percentage: number | null
+          owner_id: string
+          phone: string | null
+          primary_color: string | null
+          store_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          accent_color?: string | null
+          address?: string | null
+          cnpj?: string | null
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          max_discount_percentage?: number | null
+          owner_id: string
+          phone?: string | null
+          primary_color?: string | null
+          store_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          accent_color?: string | null
+          address?: string | null
+          cnpj?: string | null
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          max_discount_percentage?: number | null
+          owner_id?: string
+          phone?: string | null
+          primary_color?: string | null
+          store_name?: string | null
           updated_at?: string
         }
         Relationships: []

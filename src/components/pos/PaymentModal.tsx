@@ -28,6 +28,12 @@ interface UserDiscountLimit {
   max_discount_percentage: number;
 }
 
+interface PaymentSplit {
+  method: PaymentMethod;
+  amount: number;
+  installments?: number;
+}
+
 type PaymentMethod = "dinheiro" | "debito" | "credito_vista" | "credito_parcelado" | "pix" | "transferencia";
 
 export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete }: PaymentModalProps) {
@@ -41,6 +47,9 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
   const [discountError, setDiscountError] = useState("");
   const [paymentFees, setPaymentFees] = useState<Record<string, number>>({});
   const [saleDate, setSaleDate] = useState<Date>(new Date());
+  const [splitPayment, setSplitPayment] = useState(false);
+  const [payment1, setPayment1] = useState<PaymentSplit>({ method: "dinheiro", amount: 0 });
+  const [payment2, setPayment2] = useState<PaymentSplit>({ method: "pix", amount: 0 });
   const { toast } = useToast();
 
   const paymentMethods = [
@@ -56,19 +65,47 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
     if (open) {
       fetchUserDiscountLimit();
       fetchPaymentFees();
+      // Resetar pagamento dividido quando abrir
+      setSplitPayment(false);
+      setPayment1({ method: "dinheiro", amount: 0 });
+      setPayment2({ method: "pix", amount: 0 });
     }
   }, [open]);
+
+  // Atualizar payment2.amount automaticamente quando payment1.amount mudar
+  useEffect(() => {
+    if (splitPayment && payment1.amount > 0) {
+      const finalTotal = calculateFinalTotal();
+      setPayment2(prev => ({ 
+        ...prev, 
+        amount: Math.max(0, finalTotal - payment1.amount) 
+      }));
+    }
+  }, [payment1.amount, splitPayment]);
 
   const fetchUserDiscountLimit = async () => {
     try {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
 
+      // Buscar de store_settings primeiro
+      const { data: storeData, error: storeError } = await supabase
+        .from("store_settings")
+        .select("max_discount_percentage")
+        .eq("owner_id", userData.user.id)
+        .maybeSingle();
+
+      if (storeData && storeData.max_discount_percentage) {
+        setUserDiscountLimit({ max_discount_percentage: storeData.max_discount_percentage });
+        return;
+      }
+
+      // Fallback para user_discount_limits
       const { data, error } = await supabase
         .from("user_discount_limits")
         .select("max_discount_percentage")
         .eq("user_id", userData.user.id)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
         console.error("Erro ao buscar limite de desconto:", error);
@@ -170,6 +207,26 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
       const grossAmount = calculateGrossAmount();
       const netAmount = calculateNetAmount();
 
+      // Validar pagamento dividido
+      if (splitPayment) {
+        if (payment1.amount + payment2.amount !== finalTotal) {
+          toast({
+            title: "Erro",
+            description: "A soma dos pagamentos deve ser igual ao total da venda",
+            variant: "destructive"
+          });
+          return;
+        }
+        if (payment1.amount <= 0 || payment2.amount <= 0) {
+          toast({
+            title: "Erro",
+            description: "Ambos os pagamentos devem ter valor maior que zero",
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+
       // Registrar a venda
       const { data: sale, error: saleError } = await supabase
         .from("sales")
@@ -180,15 +237,41 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
           total: finalTotal,
           gross_amount: grossAmount,
           net_amount: netAmount,
-          payment_method: paymentMethod,
+          payment_method: splitPayment ? "dividido" : paymentMethod,
           installments: paymentMethod === "credito_parcelado" ? installments : 1,
-          note: note || null,
+          note: splitPayment 
+            ? `${note ? note + " | " : ""}Pagamento dividido: R$${payment1.amount.toFixed(2)} (${payment1.method}) + R$${payment2.amount.toFixed(2)} (${payment2.method})`
+            : (note || null),
           date: saleDate.toISOString(),
         })
         .select()
         .single();
 
       if (saleError) throw saleError;
+
+      // Registrar pagamentos divididos na tabela sale_payments
+      if (splitPayment) {
+        const paymentsToInsert = [
+          {
+            sale_id: sale.id,
+            payment_method: payment1.method,
+            amount: payment1.amount,
+            installments: payment1.method === "credito_parcelado" ? (payment1.installments || 1) : 1
+          },
+          {
+            sale_id: sale.id,
+            payment_method: payment2.method,
+            amount: payment2.amount,
+            installments: payment2.method === "credito_parcelado" ? (payment2.installments || 1) : 1
+          }
+        ];
+
+        const { error: paymentsError } = await supabase
+          .from("sale_payments")
+          .insert(paymentsToInsert);
+
+        if (paymentsError) throw paymentsError;
+      }
 
       // Registrar os itens da venda
       for (const item of cartItems) {
@@ -419,7 +502,100 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
             />
           </div>
 
-          {getPaymentFee() > 0 && (
+          {/* Dividir Pagamento */}
+          <div className="space-y-3 pt-3 border-t">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Dividir Pagamento</Label>
+              <Button
+                type="button"
+                variant={splitPayment ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setSplitPayment(!splitPayment);
+                  if (!splitPayment) {
+                    // Inicializar valores
+                    const finalTotal = calculateFinalTotal();
+                    setPayment1({ method: "dinheiro", amount: finalTotal / 2 });
+                    setPayment2({ method: "pix", amount: finalTotal / 2 });
+                  }
+                }}
+              >
+                {splitPayment ? "Desativar" : "Ativar"}
+              </Button>
+            </div>
+
+            {splitPayment && (
+              <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
+                {/* Primeiro Pagamento */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Primeiro Pagamento</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select 
+                      value={payment1.method} 
+                      onValueChange={(value: PaymentMethod) => setPayment1(prev => ({ ...prev, method: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {paymentMethods.map((method) => (
+                          <SelectItem key={method.id} value={method.id}>
+                            {method.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="number"
+                      min="0"
+                      max={calculateFinalTotal()}
+                      step="0.01"
+                      value={payment1.amount}
+                      onChange={(e) => setPayment1(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
+                      placeholder="R$ 0,00"
+                    />
+                  </div>
+                </div>
+
+                {/* Segundo Pagamento */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Segundo Pagamento</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select 
+                      value={payment2.method} 
+                      onValueChange={(value: PaymentMethod) => setPayment2(prev => ({ ...prev, method: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {paymentMethods.map((method) => (
+                          <SelectItem key={method.id} value={method.id}>
+                            {method.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="number"
+                      value={payment2.amount.toFixed(2)}
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+                </div>
+
+                {/* Validação */}
+                {payment1.amount + payment2.amount !== calculateFinalTotal() && (
+                  <p className="text-xs text-destructive">
+                    Atenção: Total deve ser R$ {calculateFinalTotal().toFixed(2)}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {!splitPayment && getPaymentFee() > 0 && (
             <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
               <p>Valor pago: R$ {calculateGrossAmount().toFixed(2)}</p>
               <p>Taxa: {getPaymentFee().toFixed(2)}%</p>

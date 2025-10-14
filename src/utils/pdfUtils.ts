@@ -28,6 +28,20 @@ export const generateBudgetPDF = async (budget: Budget) => {
   try {
     console.log('🔄 Iniciando geração de PDF para orçamento:', budget.id);
     
+    // Buscar configurações da loja
+    const { data: userData } = await supabase.auth.getUser();
+    let storeSettings = null;
+    
+    if (userData.user) {
+      const { data: settings } = await supabase
+        .from('store_settings')
+        .select('*')
+        .eq('owner_id', userData.user.id)
+        .maybeSingle();
+      
+      storeSettings = settings;
+    }
+    
     // Buscar itens do orçamento primeiro
     const { data: items, error } = await supabase
       .from('budget_items')
@@ -70,21 +84,39 @@ export const generateBudgetPDF = async (budget: Budget) => {
     let yPosition = 25;
     
     // === CABEÇALHO PRINCIPAL ===
+    // Usar cores da loja se disponíveis
+    const primaryColor = storeSettings?.primary_color || '#2563eb';
+    const accentColor = storeSettings?.accent_color || '#3b82f6';
+    
+    // Converter hex para RGB
+    const hexToRgb = (hex: string) => {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : { r: 37, g: 99, b: 235 };
+    };
+    
+    const primaryRgb = hexToRgb(primaryColor);
+    const accentRgb = hexToRgb(accentColor);
+    
     // Gradiente simulado com retângulos sobrepostos
-    doc.setFillColor(37, 99, 235); // blue-600
+    doc.setFillColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
     doc.rect(0, 0, pageWidth, 40, 'F');
-    doc.setFillColor(59, 130, 246); // blue-500 (mais claro)
+    doc.setFillColor(accentRgb.r, accentRgb.g, accentRgb.b);
     doc.rect(0, 25, pageWidth, 15, 'F');
     
     // Logo/Nome da empresa
     doc.setFontSize(28);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(255, 255, 255);
-    doc.text('SUA EMPRESA', margin, 22);
+    const storeName = storeSettings?.store_name || 'SUA EMPRESA';
+    doc.text(storeName, margin, 22);
     
     doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
-    doc.text('Sistema de Gestão Comercial', margin, 32);
+    doc.text('Orçamento Profissional', margin, 32);
     
     // Número do orçamento no canto direito
     doc.setFontSize(14);
@@ -145,6 +177,40 @@ export const generateBudgetPDF = async (budget: Budget) => {
     
     doc.setTextColor(0, 0, 0);
     yPosition += 25;
+    
+    // === DADOS DA EMPRESA ===
+    yPosition += 10;
+    
+    if (storeSettings?.cnpj || storeSettings?.phone || storeSettings?.address) {
+      doc.setFillColor(249, 250, 251); // gray-50
+      doc.roundedRect(margin, yPosition, pageWidth - 2 * margin, 25, 3, 3, 'F');
+      
+      yPosition += 8;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('DADOS DA EMPRESA', margin + 8, yPosition);
+      
+      yPosition += 6;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      
+      if (storeSettings.cnpj) {
+        doc.text(`CNPJ: ${storeSettings.cnpj}`, margin + 8, yPosition);
+        yPosition += 3;
+      }
+      
+      if (storeSettings.phone) {
+        doc.text(`Telefone: ${storeSettings.phone}`, margin + 8, yPosition);
+        yPosition += 3;
+      }
+      
+      if (storeSettings.address) {
+        const addressLines = doc.splitTextToSize(storeSettings.address, pageWidth - 2 * margin - 16);
+        doc.text(addressLines, margin + 8, yPosition);
+      }
+      
+      yPosition += 15;
+    }
     
     // === DADOS DO CLIENTE ===
     doc.setFillColor(254, 249, 195); // yellow-100
@@ -337,21 +403,41 @@ export const generateBudgetPDF = async (budget: Budget) => {
     doc.text('• Pagamento conforme condições acordadas', margin + 8, yPosition);
     
     // === RODAPÉ ===
-    const footerY = pageHeight - 25;
+    const footerY = pageHeight - 30;
     
-    // Linha decorativa
-    doc.setDrawColor(226, 232, 240);
+    // Linha decorativa usando cor principal
+    doc.setDrawColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
     doc.line(margin, footerY - 5, pageWidth - margin, footerY - 5);
     
-    doc.setFontSize(8);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+    
+    doc.text('Obrigado pela preferência!', pageWidth / 2, footerY, { align: 'center' });
+    
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100, 116, 139); // slate-500
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, pageWidth / 2, footerY + 5, { align: 'center' });
     
-    doc.text('Este orçamento foi gerado automaticamente pelo sistema de gestão.', pageWidth / 2, footerY, { align: 'center' });
-    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')} | Documento válido sem assinatura`, pageWidth / 2, footerY + 5, { align: 'center' });
+    // Informações da empresa no rodapé
+    if (storeSettings?.store_name) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(storeSettings.store_name, pageWidth / 2, footerY + 10, { align: 'center' });
+      
+      if (storeSettings.phone) {
+        doc.setFont('helvetica', 'normal');
+        doc.text(storeSettings.phone, pageWidth / 2, footerY + 14, { align: 'center' });
+      }
+    }
     
-    // Assinatura da empresa (canto direito)
-    doc.text('SUA EMPRESA LTDA', pageWidth - margin - 5, footerY + 12, { align: 'right' });
+    // Espaço para assinatura do cliente
+    yPosition = footerY - 30;
+    doc.setDrawColor(150, 150, 150);
+    doc.line(margin + 20, yPosition, pageWidth / 2 - 10, yPosition);
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Assinatura do Cliente', margin + 20, yPosition + 5);
     
     // === SALVAR PDF ===
     const customerName = budget.customer_name 
