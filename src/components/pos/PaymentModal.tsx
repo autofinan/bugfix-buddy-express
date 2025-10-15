@@ -209,12 +209,16 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
 
       // Validar pagamento dividido
       if (splitPayment) {
-        if (payment1.amount + payment2.amount !== finalTotal) {
+        const sum = Number(payment1.amount) + Number(payment2.amount);
+        const diff = Math.abs(sum - finalTotal);
+        
+        if (diff > 0.01) { // Tolerância de 1 centavo para erros de arredondamento
           toast({
             title: "Erro",
-            description: "A soma dos pagamentos deve ser igual ao total da venda",
+            description: `A soma dos pagamentos (R$ ${sum.toFixed(2)}) deve ser igual ao total da venda (R$ ${finalTotal.toFixed(2)})`,
             variant: "destructive"
           });
+          setLoading(false);
           return;
         }
         if (payment1.amount <= 0 || payment2.amount <= 0) {
@@ -223,6 +227,7 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
             description: "Ambos os pagamentos devem ter valor maior que zero",
             variant: "destructive"
           });
+          setLoading(false);
           return;
         }
       }
@@ -418,13 +423,13 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
               
               <div className="space-y-2">
                 <Input
-                  type="number"
-                  min="0"
-                  max={discountType === "percentage" ? (userDiscountLimit?.max_discount_percentage || 100) : total}
-                  step="0.01"
-                  value={discountValue}
+                  type="text"
+                  inputMode="decimal"
+                  value={discountValue || ""}
                   onChange={(e) => {
-                    setDiscountValue(Number(e.target.value));
+                    const value = e.target.value.replace(/[^0-9.]/g, '');
+                    const numValue = value === "" ? 0 : Number(value);
+                    setDiscountValue(numValue);
                     setDiscountError("");
                   }}
                   placeholder={discountType === "percentage" ? "%" : "R$"}
@@ -546,12 +551,14 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
                       </SelectContent>
                     </Select>
                     <Input
-                      type="number"
-                      min="0"
-                      max={calculateFinalTotal()}
-                      step="0.01"
-                      value={payment1.amount}
-                      onChange={(e) => setPayment1(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
+                      type="text"
+                      inputMode="decimal"
+                      value={payment1.amount || ""}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9.]/g, '');
+                        const numValue = value === "" ? 0 : parseFloat(value);
+                        setPayment1(prev => ({ ...prev, amount: numValue }));
+                      }}
                       placeholder="R$ 0,00"
                     />
                   </div>
@@ -577,8 +584,8 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
                       </SelectContent>
                     </Select>
                     <Input
-                      type="number"
-                      value={payment2.amount.toFixed(2)}
+                      type="text"
+                      value={payment2.amount ? payment2.amount.toFixed(2) : ""}
                       disabled
                       className="bg-muted"
                     />

@@ -305,12 +305,17 @@ export function GeneralSettings() {
             <Label htmlFor="max_discount">Limite de Desconto (%)</Label>
             <Input
               id="max_discount"
-              type="number"
-              min="0"
-              max="100"
-              step="1"
-              value={settings.max_discount_percentage}
-              onChange={(e) => setSettings(prev => ({ ...prev, max_discount_percentage: parseFloat(e.target.value) }))}
+              type="text"
+              inputMode="decimal"
+              value={settings.max_discount_percentage || ""}
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^0-9.]/g, '');
+                const numValue = value === "" ? 0 : parseFloat(value);
+                if (numValue <= 100) {
+                  setSettings(prev => ({ ...prev, max_discount_percentage: numValue }));
+                }
+              }}
+              placeholder="10"
             />
             <p className="text-xs text-muted-foreground">
               Desconto máximo permitido nas vendas
