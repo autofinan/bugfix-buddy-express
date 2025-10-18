@@ -74,14 +74,16 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
 
   // Atualizar payment2.amount automaticamente quando payment1.amount mudar
   useEffect(() => {
-    if (splitPayment && payment1.amount > 0) {
+    if (splitPayment) {
       const finalTotal = calculateFinalTotal();
+      const amount1 = Number(payment1.amount) || 0;
+      const remainingAmount = Math.max(0, finalTotal - amount1);
       setPayment2(prev => ({ 
         ...prev, 
-        amount: Math.max(0, finalTotal - payment1.amount) 
+        amount: remainingAmount
       }));
     }
-  }, [payment1.amount, splitPayment]);
+  }, [payment1.amount, splitPayment, total, discountValue, discountType]);
 
   const fetchUserDiscountLimit = async () => {
     try {
@@ -209,10 +211,12 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
 
       // Validar pagamento dividido
       if (splitPayment) {
-        const sum = Number(payment1.amount) + Number(payment2.amount);
+        const amount1 = Number(payment1.amount) || 0;
+        const amount2 = Number(payment2.amount) || 0;
+        const sum = amount1 + amount2;
         const diff = Math.abs(sum - finalTotal);
         
-        if (diff > 0.01) { // Tolerância de 1 centavo para erros de arredondamento
+        if (diff > 0.02) { // Tolerância de 2 centavos para erros de arredondamento
           toast({
             title: "Erro",
             description: `A soma dos pagamentos (R$ ${sum.toFixed(2)}) deve ser igual ao total da venda (R$ ${finalTotal.toFixed(2)})`,
@@ -221,7 +225,7 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
           setLoading(false);
           return;
         }
-        if (payment1.amount <= 0 || payment2.amount <= 0) {
+        if (amount1 <= 0 || amount2 <= 0) {
           toast({
             title: "Erro",
             description: "Ambos os pagamentos devem ter valor maior que zero",
@@ -245,7 +249,7 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
           payment_method: splitPayment ? "dividido" : paymentMethod,
           installments: paymentMethod === "credito_parcelado" ? installments : 1,
           note: splitPayment 
-            ? `${note ? note + " | " : ""}Pagamento dividido: R$${payment1.amount.toFixed(2)} (${payment1.method}) + R$${payment2.amount.toFixed(2)} (${payment2.method})`
+            ? `${note ? note + " | " : ""}Pagamento dividido: R$${(Number(payment1.amount) || 0).toFixed(2)} (${payment1.method}) + R$${(Number(payment2.amount) || 0).toFixed(2)} (${payment2.method})`
             : (note || null),
           date: saleDate.toISOString(),
         })
@@ -256,17 +260,20 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
 
       // Registrar pagamentos divididos na tabela sale_payments
       if (splitPayment) {
+        const amount1 = Number(payment1.amount) || 0;
+        const amount2 = Number(payment2.amount) || 0;
+        
         const paymentsToInsert = [
           {
             sale_id: sale.id,
             payment_method: payment1.method,
-            amount: payment1.amount,
+            amount: amount1,
             installments: payment1.method === "credito_parcelado" ? (payment1.installments || 1) : 1
           },
           {
             sale_id: sale.id,
             payment_method: payment2.method,
-            amount: payment2.amount,
+            amount: amount2,
             installments: payment2.method === "credito_parcelado" ? (payment2.installments || 1) : 1
           }
         ];
@@ -556,8 +563,8 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
                       value={payment1.amount || ""}
                       onChange={(e) => {
                         const value = e.target.value.replace(/[^0-9.]/g, '');
-                        const numValue = value === "" ? 0 : parseFloat(value);
-                        setPayment1(prev => ({ ...prev, amount: numValue }));
+                        const numValue = value === "" ? 0 : (parseFloat(value) || 0);
+                        setPayment1(prev => ({ ...prev, amount: isNaN(numValue) ? 0 : numValue }));
                       }}
                       placeholder="R$ 0,00"
                     />
