@@ -1,122 +1,45 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from '@/components/ui/sidebar';
-import {
-  Home,
+  LayoutDashboard,
   ShoppingCart,
   Package,
-  FileText,
-  DollarSign,
+  Users,
   BarChart3,
-  Tags,
-  Archive,
-  Upload,
-  PackagePlus,
-  CreditCard,
   Settings,
-  Wrench,
-  Brain,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const menuItems = [
   {
     title: 'Dashboard',
-    items: [
-      {
-        title: 'Início',
-        url: '/',
-        icon: Home,
-      },
-    ],
+    url: '/',
+    icon: LayoutDashboard,
   },
   {
     title: 'Vendas',
-    items: [
-      {
-        title: 'PDV',
-        url: '/pos',
-        icon: CreditCard,
-      },
-      {
-        title: 'Vendas',
-        url: '/sales',
-        icon: ShoppingCart,
-      },
-      {
-        title: 'Orçamentos',
-        url: '/budgets',
-        icon: FileText,
-      },
-    ],
+    url: '/sales',
+    icon: ShoppingCart,
   },
   {
     title: 'Produtos',
-    items: [
-      {
-        title: 'Produtos',
-        url: '/products',
-        icon: Package,
-      },
-      {
-        title: 'Serviços',
-        url: '/services',
-        icon: Wrench,
-      },
-      {
-        title: 'Cadastro em Lote',
-        url: '/bulk-products',
-        icon: PackagePlus,
-      },
-      {
-        title: 'Importar CSV',
-        url: '/import-csv',
-        icon: Upload,
-      },
-      {
-        title: 'Categorias',
-        url: '/categories',
-        icon: Tags,
-      },
-    ],
+    url: '/products',
+    icon: Package,
   },
   {
-    title: 'Gestão',
-    items: [
-      {
-        title: 'Estoque',
-        url: '/stock',
-        icon: Archive,
-      },
-      {
-        title: 'Despesas',
-        url: '/expenses',
-        icon: DollarSign,
-      },
-      {
-        title: 'Relatórios',
-        url: '/reports',
-        icon: BarChart3,
-      },
-      {
-        title: 'Assistente Financeiro',
-        url: '/financial-assistant',
-        icon: Brain,
-      },
-      {
-        title: 'Configurações',
-        url: '/settings',
-        icon: Settings,
-      },
-    ],
+    title: 'Clientes',
+    url: '/clients',
+    icon: Users,
+  },
+  {
+    title: 'Relatórios',
+    url: '/reports',
+    icon: BarChart3,
+  },
+  {
+    title: 'Configurações',
+    url: '/settings',
+    icon: Settings,
   },
 ];
 
@@ -124,31 +47,29 @@ export function AppSidebar() {
   const location = useLocation();
 
   return (
-    <Sidebar>
-      <SidebarContent>
-        {menuItems.map((group) => (
-          <SidebarGroup key={group.title}>
-            <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={location.pathname === item.url}
-                    >
-                      <Link to={item.url}>
-                        <item.icon className="w-4 h-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
-      </SidebarContent>
-    </Sidebar>
+    <aside className="hidden lg:flex w-64 bg-gradient-sidebar border-r border-sidebar-border flex-col h-full">
+      <div className="flex-1 overflow-y-auto py-6 px-3 scrollbar-thin scrollbar-thumb-sidebar-accent scrollbar-track-transparent">
+        <nav className="space-y-1">
+          {menuItems.map((item) => {
+            const isActive = location.pathname === item.url;
+            return (
+              <Link
+                key={item.url}
+                to={item.url}
+                className={cn(
+                  "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200",
+                  isActive
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                )}
+              >
+                <item.icon className="h-5 w-5 flex-shrink-0" />
+                <span>{item.title}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+    </aside>
   );
 }

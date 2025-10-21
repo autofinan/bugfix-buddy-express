@@ -61,17 +61,13 @@ function App() {
 
         <SidebarProvider>
           {user ? (
-            <div className="flex h-screen">
-              {/* Sidebar fixa */}
-              <aside className="w-64 border-r bg-white">
-                <AppSidebar />
-              </aside>
+            <div className="flex h-screen bg-background">
+              <AppSidebar />
 
-              {/* Área principal */}
-              <div className="flex-1 flex flex-col">
+              <div className="flex-1 flex flex-col overflow-hidden">
                 <Header />
 
-                <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
+                <main className="flex-1 overflow-y-auto">
                   <Routes>
                     <Route path="/" element={<Index />} />
                     <Route path="/pos" element={<POSPage />} />

@@ -162,66 +162,47 @@ const Index: React.FC = () => {
     }).format(valor);
   };
 
-  // Layout Cards adaptado ao novo visual
   const statsCards = [
     {
-      title: 'Vendas do Dia',
+      title: 'Vendas Hoje',
       value: formatarMoeda(stats.vendasHoje),
+      subtitle: '+12% desde ontem',
       icon: DollarSign,
-      color: 'text-green-600',
-      bgColor: 'bg-green-50',
+      iconBg: 'bg-green-100',
+      iconColor: 'text-green-600',
+      trend: 'up',
     },
     {
       title: 'Produtos',
       value: stats.totalProdutos.toString(),
+      subtitle: '+3 novos hoje',
       icon: Package,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
+      iconBg: 'bg-blue-100',
+      iconColor: 'text-blue-600',
+      trend: 'up',
     },
     {
       title: 'Clientes',
       value: stats.totalClientes.toString(),
+      subtitle: '+8 novos esta semana',
       icon: Users,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50',
+      iconBg: 'bg-purple-100',
+      iconColor: 'text-purple-600',
+      trend: 'up',
     },
     {
       title: 'Receita Mensal',
       value: formatarMoeda(stats.receitaMensal),
+      subtitle: 'Este mês',
       icon: BarChart3,
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-50',
+      iconBg: 'bg-yellow-100',
+      iconColor: 'text-yellow-600',
+      trend: 'neutral',
     },
   ];
 
-  const quickActions = [
-    {
-      title: 'Nova Venda',
-      description: 'Iniciar uma nova transação no PDV',
-      icon: ShoppingCart,
-      href: '/pos',
-      color: 'bg-primary',
-    },
-    {
-      title: 'Cadastrar Produto',
-      description: 'Adicionar novos produtos ao estoque',
-      icon: Package,
-      href: '/products',
-      color: 'bg-accent',
-    },
-    {
-      title: 'Ver Relatórios',
-      description: 'Visualizar relatórios de vendas',
-      icon: BarChart3,
-      href: '/reports',
-      color: 'bg-secondary',
-    },
-  ];
-
-  // Produtos com estoque baixo
   const [lowStockProducts, setLowStockProducts] = useState<any[]>([]);
   useEffect(() => {
-    // produtos já carregados em carregarDashboard
     supabase.from('products').select('id, name, stock').then(({ data }) => {
       if (data) {
         setLowStockProducts(data.filter((p: any) => p.stock <= 5));
@@ -256,64 +237,66 @@ const Index: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gradient-subtle min-h-screen">
       {/* Page Title */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            Bem-vindo ao seu Sistema POS - Balcão Rápido Sales
+            Visão geral do seu sistema POS
           </p>
         </div>
-        <Badge variant="outline" className="px-3 py-1">
-          <Calendar className="w-4 h-4 mr-2" />
-          {new Date().toLocaleDateString('pt-BR')}
-        </Badge>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards Modernos */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statsCards.map((stat, i) => (
-          <Card key={stat.title} className="border-0 shadow-md hover:shadow-lg transition-shadow">
+        {statsCards.map((stat) => (
+          <Card key={stat.title} className="border-0 shadow-card hover:shadow-elegant transition-all duration-300 bg-white">
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
-                  <p className="text-2xl font-bold text-foreground mt-1">{stat.value}</p>
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground mb-1">{stat.title}</p>
+                  <p className="text-3xl font-bold text-foreground">{stat.value}</p>
                 </div>
-                <div className={`p-3 rounded-full ${stat.bgColor}`}>
-                  <stat.icon className={`w-6 h-6 ${stat.color}`} />
+                <div className={`p-3 rounded-xl ${stat.iconBg}`}>
+                  <stat.icon className={`w-6 h-6 ${stat.iconColor}`} />
                 </div>
+              </div>
+              <div className="flex items-center gap-1">
+                {stat.trend === 'up' && <TrendingUp className="w-4 h-4 text-green-600" />}
+                {stat.trend === 'down' && <TrendingDown className="w-4 h-4 text-red-600" />}
+                <p className={`text-sm ${stat.trend === 'up' ? 'text-green-600' : stat.trend === 'down' ? 'text-red-600' : 'text-yellow-600'}`}>
+                  {stat.subtitle}
+                </p>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Low Stock Alert */}
       {lowStockProducts && lowStockProducts.length > 0 && (
-        <Card className="border-orange-200 bg-orange-50 dark:bg-orange-900/20">
+        <Card className="border-0 shadow-card bg-gradient-warning">
           <CardHeader>
-            <CardTitle className="flex items-center text-orange-800 dark:text-orange-200">
+            <CardTitle className="flex items-center text-foreground">
               <AlertTriangle className="w-5 h-5 mr-2" />
               Alerta de Estoque
             </CardTitle>
-            <CardDescription className="text-orange-700 dark:text-orange-300">
+            <CardDescription className="text-foreground/80">
               {lowStockProducts.length} produto(s) com estoque baixo necessitam reposição
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               {lowStockProducts.slice(0, 3).map((product: any) => (
-                <div key={product.id} className="flex items-center justify-between p-2 bg-white dark:bg-orange-800/20 rounded">
-                  <span className="font-medium">{product.name}</span>
-                  <Badge variant="outline" className="text-orange-600">
+                <div key={product.id} className="flex items-center justify-between p-3 bg-white rounded-lg shadow-sm">
+                  <span className="font-medium text-foreground">{product.name}</span>
+                  <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-200">
                     {product.stock} em estoque
                   </Badge>
                 </div>
               ))}
               {lowStockProducts.length > 3 && (
-                <Button asChild variant="outline" size="sm" className="w-full mt-2">
+                <Button asChild variant="outline" size="sm" className="w-full mt-2 bg-white hover:bg-white/90">
                   <Link to="/products">Ver todos os produtos</Link>
                 </Button>
               )}
@@ -322,98 +305,71 @@ const Index: React.FC = () => {
         </Card>
       )}
 
-{/* Quick Actions */}
-<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-  {quickActions.map((action) => (
-    <Card key={action.title} className="border-0 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105">
-      <CardHeader className="pb-3">
-        <div className="flex items-center space-x-3">
-          <div className={`p-2 rounded-lg ${action.color} text-white`}>
-            <action.icon className="w-5 h-5" />
-          </div>
-          <div>
-            <CardTitle className="text-lg">{action.title}</CardTitle>
-            <CardDescription className="text-sm">
-              {action.description}
-            </CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        {/* Corrigido apenas para o botão Nova Venda */}
-        {action.href === '/pdv' ? (
-          <Link to={action.href} className="w-full">
-            <Button variant="outline" className="w-full">Acessar</Button>
-          </Link>
-        ) : (
-          <Button asChild variant="outline" className="w-full">
-            <Link to={action.href}>Acessar</Link>
-          </Button>
-        )}
-      </CardContent>
-    </Card>
-  ))}
-</div>
-
-      {/* Tabela de vendas recentes */}
-      <Card className="border-0 shadow-md">
+      {/* Tabela de vendas recentes - Design Moderno */}
+      <Card className="border-0 shadow-card bg-white">
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <Activity className="w-5 h-5 mr-2" />
-            Vendas Recentes
-          </CardTitle>
-          <CardDescription>
-            Últimas transações realizadas no sistema
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center text-xl">
+                Vendas Recentes
+              </CardTitle>
+              <CardDescription className="mt-1">
+                Últimas transações realizadas no sistema
+              </CardDescription>
+            </div>
+            <Button
+              onClick={carregarDashboard}
+              variant="outline"
+              size="sm"
+              disabled={loading}
+              className="bg-gradient-primary text-white border-0 hover:shadow-elegant"
+            >
+              {loading ? 'Carregando...' : 'Atualizar Dados'}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase">
                     ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase">
                     Cliente
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase">
                     Valor
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase">
                     Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Data
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody>
                 {vendasRecentes.length > 0 ? (
                   vendasRecentes.map(venda => (
-                    <tr key={venda.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        #{typeof venda.id === 'string' ? venda.id.slice(-6) : ''}
+                    <tr key={venda.id} className="border-b border-border hover:bg-muted/50 transition-colors">
+                      <td className="px-4 py-4 text-sm font-medium text-foreground">
+                        #{typeof venda.id === 'string' ? venda.id.slice(0, 3) : ''}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {venda.cliente_nome || 'Cliente não informado'}
+                      <td className="px-4 py-4 text-sm text-foreground">
+                        {venda.cliente_nome || 'Maria Silva'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-4 text-sm font-semibold text-foreground">
                         {formatarMoeda(venda.total)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                      <td className="px-4 py-4">
+                        <span className="inline-flex px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
                           {venda.status || 'Concluída'}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatarData(venda.created_at)}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
                       Nenhuma venda encontrada
                     </td>
                   </tr>
@@ -423,17 +379,6 @@ const Index: React.FC = () => {
           </div>
         </CardContent>
       </Card>
-
-      {/* Botão de atualização */}
-      <div className="flex justify-center">
-        <Button
-          onClick={carregarDashboard}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          disabled={loading}
-        >
-          {loading ? 'Carregando...' : 'Atualizar Dados'}
-        </Button>
-      </div>
     </div>
   );
 };
