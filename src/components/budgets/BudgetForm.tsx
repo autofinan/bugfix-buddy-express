@@ -26,13 +26,29 @@ interface BudgetItem {
   total_price: number;
 }
 
+interface Budget {
+  id: string;
+  customer_name: string | null;
+  customer_email: string | null;
+  customer_phone: string | null;
+  subtotal: number;
+  discount_type: string | null;
+  discount_value: number;
+  total: number;
+  status: 'open' | 'converted' | 'canceled';
+  notes: string | null;
+  valid_until: string | null;
+  created_at: string;
+}
+
 interface BudgetFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: () => void;
+  budgetToEdit?: Budget | null;
 }
 
-export function BudgetForm({ open, onOpenChange, onSave }: BudgetFormProps) {
+export function BudgetForm({ open, onOpenChange, onSave, budgetToEdit }: BudgetFormProps) {
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -50,8 +66,67 @@ export function BudgetForm({ open, onOpenChange, onSave }: BudgetFormProps) {
   useEffect(() => {
     if (open) {
       fetchProducts();
+      if (budgetToEdit) {
+        loadBudgetData(budgetToEdit);
+      } else {
+        resetForm();
+      }
     }
-  }, [open]);
+  }, [open, budgetToEdit]);
+
+  const loadBudgetData = async (budget: Budget) => {
+    setCustomerName(budget.customer_name || "");
+    setCustomerEmail(budget.customer_email || "");
+    setCustomerPhone(budget.customer_phone || "");
+    setNotes(budget.notes || "");
+    setValidUntil(budget.valid_until || "");
+    setDiscountType(budget.discount_type as "percentage" | "fixed" || "percentage");
+    setDiscountValue(budget.discount_value || 0);
+
+    try {
+      const { data: budgetItems, error } = await supabase
+        .from("budget_items")
+        .select(`
+          product_id,
+          quantity,
+          unit_price,
+          total_price,
+          products(name)
+        `)
+        .eq("budget_id", budget.id);
+
+      if (error) throw error;
+
+      const formattedItems: BudgetItem[] = budgetItems.map((item: any) => ({
+        product_id: item.product_id,
+        product_name: item.products?.name || "Produto",
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total_price: item.total_price
+      }));
+
+      setItems(formattedItems);
+    } catch (error) {
+      console.error("Erro ao carregar itens do orçamento:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar itens do orçamento",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const resetForm = () => {
+    setCustomerName("");
+    setCustomerEmail("");
+    setCustomerPhone("");
+    setNotes("");
+    setValidUntil("");
+    setDiscountType("percentage");
+    setDiscountValue(0);
+    setItems([]);
+    setPaymentMethod("pix");
+  };
 
   const fetchProducts = async () => {
     try {
@@ -147,56 +222,97 @@ export function BudgetForm({ open, onOpenChange, onSave }: BudgetFormProps) {
       const discount = calculateDiscount();
       const total = calculateTotal();
 
-      // Criar orçamento 
-      const { data: budget, error: budgetError } = await supabase
-        .from("budgets")
-        .insert({
-          customer_name: customerName || null,
-          customer_email: customerEmail || null,
-          customer_phone: customerPhone || null,
-          subtotal,
-          discount_type: discountValue > 0 ? discountType : null,
-          discount_value: discountValue,
-          total,
-          notes: notes || null,
-          valid_until: validUntil || null,
-          owner_id
-        } as any)
-        .select()
-        .single();
+      if (budgetToEdit) {
+        // Atualizar orçamento existente
+        const { error: budgetError } = await supabase
+          .from("budgets")
+          .update({
+            customer_name: customerName || null,
+            customer_email: customerEmail || null,
+            customer_phone: customerPhone || null,
+            subtotal,
+            discount_type: discountValue > 0 ? discountType : null,
+            discount_value: discountValue,
+            total,
+            notes: notes || null,
+            valid_until: validUntil || null,
+            updated_at: new Date().toISOString()
+          } as any)
+          .eq("id", budgetToEdit.id);
 
-      if (budgetError) throw budgetError;
+        if (budgetError) throw budgetError;
 
-      // Criar itens do orçamento
-      const budgetItems = items.map(item => ({
-        budget_id: budget.id,
-        product_id: item.product_id,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        total_price: item.total_price
-      }));
+        // Deletar itens antigos
+        const { error: deleteError } = await supabase
+          .from("budget_items")
+          .delete()
+          .eq("budget_id", budgetToEdit.id);
 
-      const { error: itemsError } = await supabase
-        .from("budget_items")
-        .insert(budgetItems);
+        if (deleteError) throw deleteError;
 
-      if (itemsError) throw itemsError;
+        // Criar novos itens
+        const budgetItems = items.map(item => ({
+          budget_id: budgetToEdit.id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total_price: item.total_price
+        }));
 
-      toast({
-        title: "Sucesso",
-        description: "Orçamento criado com sucesso!"
-      });
+        const { error: itemsError } = await supabase
+          .from("budget_items")
+          .insert(budgetItems);
+
+        if (itemsError) throw itemsError;
+
+        toast({
+          title: "Sucesso",
+          description: "Orçamento atualizado com sucesso!"
+        });
+      } else {
+        // Criar novo orçamento
+        const { data: budget, error: budgetError } = await supabase
+          .from("budgets")
+          .insert({
+            customer_name: customerName || null,
+            customer_email: customerEmail || null,
+            customer_phone: customerPhone || null,
+            subtotal,
+            discount_type: discountValue > 0 ? discountType : null,
+            discount_value: discountValue,
+            total,
+            notes: notes || null,
+            valid_until: validUntil || null,
+            owner_id
+          } as any)
+          .select()
+          .single();
+
+        if (budgetError) throw budgetError;
+
+        // Criar itens do orçamento
+        const budgetItems = items.map(item => ({
+          budget_id: budget.id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total_price: item.total_price
+        }));
+
+        const { error: itemsError } = await supabase
+          .from("budget_items")
+          .insert(budgetItems);
+
+        if (itemsError) throw itemsError;
+
+        toast({
+          title: "Sucesso",
+          description: "Orçamento criado com sucesso!"
+        });
+      }
 
       // Reset form
-      setCustomerName("");
-      setCustomerEmail("");
-      setCustomerPhone("");
-      setNotes("");
-      setValidUntil("");
-      setDiscountType("percentage");
-      setDiscountValue(0);
-      setItems([]);
-      setPaymentMethod("pix");
+      resetForm();
       
       onSave();
     } catch (error) {

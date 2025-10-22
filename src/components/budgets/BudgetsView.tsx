@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Eye, FileText, CheckCircle, X } from "lucide-react";
+import { Plus, Search, Eye, FileText, CheckCircle, X, Edit } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { BudgetForm } from "./BudgetForm";
@@ -32,6 +32,7 @@ export default function BudgetsView() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
@@ -420,9 +421,20 @@ export default function BudgetsView() {
                     <Eye className="h-4 w-4 mr-1" />
                     Ver Detalhes
                   </Button>
-                  
+
                   {budget.status === "open" && (
                     <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditingBudget(budget);
+                          setShowForm(true);
+                        }}
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Editar
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -484,11 +496,18 @@ export default function BudgetsView() {
       {showForm && (
         <BudgetForm
           open={showForm}
-          onOpenChange={setShowForm}
+          onOpenChange={(open) => {
+            setShowForm(open);
+            if (!open) {
+              setEditingBudget(null);
+            }
+          }}
           onSave={() => {
             setShowForm(false);
+            setEditingBudget(null);
             fetchBudgets();
           }}
+          budgetToEdit={editingBudget}
         />
       )}
 

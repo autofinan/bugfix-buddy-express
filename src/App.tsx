@@ -72,7 +72,8 @@ function App() {
                 <Header />
 
                 <main className="flex-1 overflow-y-auto p-6 bg-gradient-subtle">
-                  <Routes>
+                  <div className="max-w-[1600px] w-full mx-auto">
+                    <Routes>
                     <Route path="/" element={<Index />} />
                     <Route path="/pos" element={<POSPage />} />
                     <Route path="/products" element={<ProductsPage />} />
@@ -89,7 +90,8 @@ function App() {
                     <Route path="/stock-adjustment" element={<StockAdjustmentPage />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="*" element={<NotFound />} />
-                  </Routes>
+                    </Routes>
+                  </div>
                 </main>
               </div>
             </div>

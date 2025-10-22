@@ -65,10 +65,13 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 to-secondary/10 p-4">
-      <Card className="w-full max-w-md p-6">
-        <div className="flex items-center justify-center mb-6">
-          <ShoppingCart className="h-8 w-8 text-primary mr-2" />
-          <h1 className="text-2xl font-bold">Sistema POS</h1>
+      <Card className="w-full max-w-md p-8 shadow-elegant">
+        <div className="flex flex-col items-center justify-center mb-8">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-primary shadow-lg mb-4">
+            <ShoppingCart className="h-8 w-8 text-white" />
+          </div>
+          <h1 className="text-3xl font-bold text-primary">MeuGestorPro</h1>
+          <p className="text-sm text-muted-foreground mt-2">Sistema de Gestão Profissional</p>
         </div>
 
         <Tabs defaultValue="signin" className="w-full">
