@@ -63,7 +63,7 @@ function App() {
           {user ? (
             <div className="flex h-screen">
               {/* Sidebar fixa */}
-              <aside className="w-64 border-r bg-white">
+              <aside className="w-64 border-r bg-sidebar">
                 <AppSidebar />
               </aside>
 
@@ -71,7 +71,7 @@ function App() {
               <div className="flex-1 flex flex-col">
                 <Header />
 
-                <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
+                <main className="flex-1 overflow-y-auto p-6 bg-gradient-subtle">
                   <Routes>
                     <Route path="/" element={<Index />} />
                     <Route path="/pos" element={<POSPage />} />

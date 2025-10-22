@@ -22,32 +22,32 @@ export default function Header({ onMenuToggle, onCartToggle }: HeaderProps) {
   const totalItemsInCart = (items || []).reduce((total, item) => total + item.quantity, 0);
 
   return (
-    <header className="flex-shrink-0 border-b bg-background">
+    <header className="flex-shrink-0 border-b bg-gradient-header shadow-md">
       <div className="flex h-16 items-center px-4 lg:px-6">
-        
+
         {/* Lado Esquerdo */}
         <div className="flex items-center gap-3">
-          
+
           {/* Botão Menu Mobile */}
           {onMenuToggle && (
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden"
+              className="lg:hidden text-white hover:bg-white/10"
               onClick={onMenuToggle}
             >
               <Menu className="h-5 w-5" />
             </Button>
           )}
-          
+
           {/* Logo e Título */}
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/80">
-              <Store className="h-4 w-4 text-primary-foreground" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
+              <Store className="h-4 w-4 text-white" />
             </div>
             <div className="hidden sm:block">
-              <h1 className="text-lg font-semibold text-foreground">Sistema POS</h1>
-              <p className="text-xs text-muted-foreground">Gestão de Vendas & Estoque</p>
+              <h1 className="text-lg font-bold text-white">MeuGestorPro</h1>
+              <p className="text-xs text-white/80">Gestão Profissional</p>
             </div>
           </div>
         </div>
@@ -57,17 +57,16 @@ export default function Header({ onMenuToggle, onCartToggle }: HeaderProps) {
           
           {/* Botão Carrinho */}
           {onCartToggle && (
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={onCartToggle}
-              className="relative"
+              className="relative text-white hover:bg-white/10"
             >
               <ShoppingCart className="h-5 w-5" />
               {totalItemsInCart > 0 && (
-                <Badge 
-                  variant="destructive" 
-                  className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+                <Badge
+                  className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-secondary hover:bg-secondary"
                 >
                   {totalItemsInCart}
                 </Badge>
@@ -78,7 +77,7 @@ export default function Header({ onMenuToggle, onCartToggle }: HeaderProps) {
           {/* Menu do Usuário */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-2">
+              <Button variant="ghost" size="sm" className="gap-2 text-white hover:bg-white/10">
                 <User className="h-4 w-4" />
                 <span className="hidden sm:inline-block max-w-32 truncate">
                   {user?.email || 'Usuário'}
