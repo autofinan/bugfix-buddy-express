@@ -6,9 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ServiceForm } from "./ServiceForm";
-import { Plus, Search, Edit, Trash2, Package } from "lucide-react";
+import { CategoryManager } from "./CategoryManager";
+import { Plus, Search, Edit, Trash2, Package, FolderOpen } from "lucide-react";
+import * as LucideIcons from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,12 +27,17 @@ interface Service {
   id: string;
   name: string;
   description: string | null;
-  category: string | null;
+  category_id: string | null;
   price: number;
   duration: string | null;
   notes: string | null;
   is_active: boolean;
   created_at: string;
+  service_categories?: {
+    name: string;
+    color: string;
+    icon: string;
+  } | null;
 }
 
 export default function ServicesView() {
@@ -50,7 +58,14 @@ export default function ServicesView() {
       setLoading(true);
       const { data, error } = await supabase
         .from("services")
-        .select("*")
+        .select(`
+          *,
+          service_categories (
+            name,
+            color,
+            icon
+          )
+        `)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -110,7 +125,7 @@ export default function ServicesView() {
 
   const filteredServices = services.filter(service =>
     service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    service.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    service.service_categories?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     service.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -123,7 +138,7 @@ export default function ServicesView() {
         <div>
           <h1 className="text-3xl font-bold">Serviços</h1>
           <p className="text-muted-foreground mt-1">
-            {services.length} serviço(s) cadastrado(s)
+            Gerencie seus serviços e categorias
           </p>
         </div>
         <Button onClick={() => setShowForm(true)}>
@@ -131,6 +146,20 @@ export default function ServicesView() {
           Novo Serviço
         </Button>
       </div>
+
+      <Tabs defaultValue="services" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="services" className="gap-2">
+            <Package className="h-4 w-4" />
+            Serviços ({services.length})
+          </TabsTrigger>
+          <TabsTrigger value="categories" className="gap-2">
+            <FolderOpen className="h-4 w-4" />
+            Categorias
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="services" className="space-y-4">
 
       <Card className="p-6">
         <div className="flex items-center gap-2 mb-4">
@@ -183,8 +212,25 @@ export default function ServicesView() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {service.category && (
-                          <Badge variant="outline">{service.category}</Badge>
+                        {service.service_categories ? (
+                          <Badge
+                            variant="outline"
+                            className="gap-1.5"
+                            style={{
+                              borderColor: service.service_categories.color,
+                              color: service.service_categories.color
+                            }}
+                          >
+                            {(() => {
+                              const IconComponent = (LucideIcons as any)[service.service_categories.icon] || LucideIcons.Briefcase;
+                              return <IconComponent className="h-3 w-3" />;
+                            })()}
+                            {service.service_categories.name}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-muted-foreground">
+                            Sem categoria
+                          </Badge>
                         )}
                       </TableCell>
                       <TableCell>{service.duration || "-"}</TableCell>
@@ -234,8 +280,14 @@ export default function ServicesView() {
                           <div className="font-medium">{service.name}</div>
                         </TableCell>
                         <TableCell>
-                          {service.category && (
-                            <Badge variant="outline">{service.category}</Badge>
+                          {service.service_categories ? (
+                            <Badge variant="outline">
+                              {service.service_categories.name}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-muted-foreground">
+                              Sem categoria
+                            </Badge>
                           )}
                         </TableCell>
                         <TableCell className="text-right">
@@ -274,6 +326,12 @@ export default function ServicesView() {
           </div>
         )}
       </Card>
+        </TabsContent>
+
+        <TabsContent value="categories">
+          <CategoryManager />
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent>

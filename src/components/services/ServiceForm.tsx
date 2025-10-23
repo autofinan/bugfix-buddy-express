@@ -7,7 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
+import * as LucideIcons from "lucide-react";
+import { CategoryForm } from "./CategoryForm";
 
 interface ServiceFormProps {
   serviceId?: string;
@@ -15,14 +17,22 @@ interface ServiceFormProps {
   onCancel: () => void;
 }
 
-const categories = ["Manutenção", "Design", "Consultoria", "Formatação", "Limpeza", "Estética", "Outros"];
+interface ServiceCategory {
+  id: string;
+  name: string;
+  color: string;
+  icon: string;
+  estimated_profit_margin: number | null;
+}
 
 export function ServiceForm({ serviceId, onSuccess, onCancel }: ServiceFormProps) {
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<ServiceCategory[]>([]);
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    category: "",
+    category_id: "",
     price: "",
     duration: "",
     notes: "",
@@ -31,10 +41,38 @@ export function ServiceForm({ serviceId, onSuccess, onCancel }: ServiceFormProps
   const { toast } = useToast();
 
   useEffect(() => {
+    fetchCategories();
     if (serviceId) {
       fetchService();
     }
   }, [serviceId]);
+
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("service_categories")
+        .select("id, name, color, icon, estimated_profit_margin")
+        .order("is_default", { ascending: false })
+        .order("name");
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        const { data: user } = await supabase.auth.getUser();
+        if (user.user) {
+          await supabase.rpc("create_default_service_categories", {
+            user_id: user.user.id
+          });
+          await fetchCategories();
+        }
+        return;
+      }
+
+      setCategories(data);
+    } catch (error: any) {
+      console.error("Erro ao carregar categorias:", error);
+    }
+  };
 
   const fetchService = async () => {
     try {
@@ -50,7 +88,7 @@ export function ServiceForm({ serviceId, onSuccess, onCancel }: ServiceFormProps
         setFormData({
           name: data.name || "",
           description: data.description || "",
-          category: data.category || "",
+          category_id: data.category_id || "",
           price: data.price?.toString() || "",
           duration: data.duration || "",
           notes: data.notes || "",
@@ -77,7 +115,7 @@ export function ServiceForm({ serviceId, onSuccess, onCancel }: ServiceFormProps
       const serviceData = {
         name: formData.name,
         description: formData.description || null,
-        category: formData.category || null,
+        category_id: formData.category_id || null,
         price: parseFloat(formData.price) || 0,
         duration: formData.duration || null,
         notes: formData.notes || null,
@@ -147,23 +185,43 @@ export function ServiceForm({ serviceId, onSuccess, onCancel }: ServiceFormProps
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div>
+        <div className="space-y-2">
           <Label htmlFor="category">Categoria</Label>
-          <Select
-            value={formData.category}
-            onValueChange={(value) => setFormData({ ...formData, category: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map((cat) => (
-                <SelectItem key={cat} value={cat}>
-                  {cat}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            <Select
+              value={formData.category_id}
+              onValueChange={(value) => setFormData({ ...formData, category_id: value })}
+            >
+              <SelectTrigger className="flex-1">
+                <SelectValue placeholder="Selecione uma categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((cat) => {
+                  const IconComponent = (LucideIcons as any)[cat.icon] || LucideIcons.Briefcase;
+                  return (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      <div className="flex items-center gap-2">
+                        <IconComponent className="w-4 h-4" style={{ color: cat.color }} />
+                        <span>{cat.name}</span>
+                        {cat.estimated_profit_margin && (
+                          <span className="text-xs text-muted-foreground">({cat.estimated_profit_margin}%)</span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => setShowCategoryForm(true)}
+              title="Criar nova categoria"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         <div>
@@ -222,6 +280,15 @@ export function ServiceForm({ serviceId, onSuccess, onCancel }: ServiceFormProps
           Cancelar
         </Button>
       </div>
+
+      <CategoryForm
+        open={showCategoryForm}
+        onOpenChange={setShowCategoryForm}
+        onSave={() => {
+          fetchCategories();
+          setShowCategoryForm(false);
+        }}
+      />
     </form>
   );
 }
