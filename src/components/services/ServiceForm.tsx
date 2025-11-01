@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { CategoryForm } from "./CategoryForm";
+import { ServiceVariationForm } from "./ServiceVariationForm";
 
 interface ServiceFormProps {
   serviceId?: string;
@@ -25,10 +26,19 @@ interface ServiceCategory {
   estimated_profit_margin: number | null;
 }
 
+interface ServiceVariation {
+  id?: string;
+  name: string;
+  part_cost: number;
+  labor_cost: number;
+}
+
 export function ServiceForm({ serviceId, onSuccess, onCancel }: ServiceFormProps) {
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [serviceType, setServiceType] = useState<"fixed" | "variable">("fixed");
+  const [variations, setVariations] = useState<ServiceVariation[]>([]);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -50,7 +60,7 @@ export function ServiceForm({ serviceId, onSuccess, onCancel }: ServiceFormProps
   const fetchCategories = async () => {
     try {
       const { data, error } = await supabase
-        .from("service_categories")
+        .from("service_categories" as any)
         .select("id, name, color, icon, estimated_profit_margin")
         .order("is_default", { ascending: false })
         .order("name");
@@ -60,7 +70,7 @@ export function ServiceForm({ serviceId, onSuccess, onCancel }: ServiceFormProps
       if (!data || data.length === 0) {
         const { data: user } = await supabase.auth.getUser();
         if (user.user) {
-          await supabase.rpc("create_default_service_categories", {
+          await supabase.rpc("create_default_service_categories" as any, {
             user_id: user.user.id
           });
           await fetchCategories();
@@ -68,7 +78,7 @@ export function ServiceForm({ serviceId, onSuccess, onCancel }: ServiceFormProps
         return;
       }
 
-      setCategories(data);
+      setCategories(data as unknown as ServiceCategory[]);
     } catch (error: any) {
       console.error("Erro ao carregar categorias:", error);
     }
@@ -85,15 +95,30 @@ export function ServiceForm({ serviceId, onSuccess, onCancel }: ServiceFormProps
       if (error) throw error;
 
       if (data) {
+        const serviceData = data as any;
         setFormData({
-          name: data.name || "",
-          description: data.description || "",
-          category_id: data.category_id || "",
-          price: data.price?.toString() || "",
-          duration: data.duration || "",
-          notes: data.notes || "",
-          is_active: data.is_active ?? true,
+          name: serviceData.name || "",
+          description: serviceData.description || "",
+          category_id: serviceData.category_id || "",
+          price: serviceData.price?.toString() || "",
+          duration: serviceData.duration || "",
+          notes: serviceData.notes || "",
+          is_active: serviceData.is_active ?? true,
         });
+        setServiceType(serviceData.service_type || "fixed");
+
+        // Carregar variações se for serviço variável
+        if (serviceData.service_type === "variable") {
+          const { data: variationsData } = await supabase
+            .from("service_variations" as any)
+            .select("*")
+            .eq("service_id", serviceId)
+            .eq("is_active", true);
+          
+          if (variationsData) {
+            setVariations(variationsData as unknown as ServiceVariation[]);
+          }
+        }
       }
     } catch (error: any) {
       toast({
@@ -106,6 +131,29 @@ export function ServiceForm({ serviceId, onSuccess, onCancel }: ServiceFormProps
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validações
+    if (serviceType === "variable" && variations.length === 0) {
+      toast({
+        title: "Erro",
+        description: "Adicione pelo menos uma variação para serviços do tipo variável",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (serviceType === "variable") {
+      const hasInvalidVariation = variations.some(v => !v.name.trim());
+      if (hasInvalidVariation) {
+        toast({
+          title: "Erro",
+          description: "Todas as variações devem ter um nome",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -120,33 +168,66 @@ export function ServiceForm({ serviceId, onSuccess, onCancel }: ServiceFormProps
         duration: formData.duration || null,
         notes: formData.notes || null,
         is_active: formData.is_active,
+        service_type: serviceType,
         owner_id: user.id,
       };
+
+      let savedServiceId = serviceId;
 
       if (serviceId) {
         const { error } = await supabase
           .from("services")
-          .update(serviceData)
+          .update(serviceData as any)
           .eq("id", serviceId);
 
         if (error) throw error;
 
-        toast({
-          title: "Serviço atualizado",
-          description: "Serviço atualizado com sucesso!",
-        });
+        // Desativar variações antigas se mudou de variável para fixo
+        if (serviceType === "fixed") {
+          await supabase
+            .from("service_variations" as any)
+            .update({ is_active: false })
+            .eq("service_id", serviceId);
+        }
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("services")
-          .insert([serviceData]);
+          .insert([serviceData as any])
+          .select()
+          .single();
 
         if (error) throw error;
-
-        toast({
-          title: "Serviço cadastrado",
-          description: "Serviço cadastrado com sucesso!",
-        });
+        savedServiceId = data.id;
       }
+
+      // Salvar variações se for serviço variável
+      if (serviceType === "variable" && savedServiceId) {
+        // Deletar variações antigas
+        await supabase
+          .from("service_variations" as any)
+          .delete()
+          .eq("service_id", savedServiceId);
+
+        // Inserir novas variações
+        const variationsToInsert = variations.map(v => ({
+          service_id: savedServiceId,
+          name: v.name,
+          part_cost: v.part_cost || 0,
+          labor_cost: v.labor_cost || 0,
+          owner_id: user.id,
+        }));
+
+        const { error: variationsError } = await supabase
+          .from("service_variations" as any)
+          .insert(variationsToInsert);
+
+        if (variationsError) throw variationsError;
+      }
+
+      toast({
+        title: serviceId ? "Serviço atualizado" : "Serviço cadastrado",
+        description: serviceId ? "Serviço atualizado com sucesso!" : "Serviço cadastrado com sucesso!",
+      });
 
       onSuccess();
     } catch (error: any) {
@@ -182,6 +263,22 @@ export function ServiceForm({ serviceId, onSuccess, onCancel }: ServiceFormProps
           placeholder="Descreva o serviço oferecido..."
           rows={3}
         />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="serviceType">Tipo de Serviço</Label>
+        <Select value={serviceType} onValueChange={(value: "fixed" | "variable") => setServiceType(value)}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="fixed">🔹 Fixo</SelectItem>
+            <SelectItem value="variable">🔸 Variável (com variações)</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Serviços fixos têm um preço único. Serviços variáveis permitem criar variações com preços diferentes.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -224,20 +321,28 @@ export function ServiceForm({ serviceId, onSuccess, onCancel }: ServiceFormProps
           </div>
         </div>
 
-        <div>
-          <Label htmlFor="price">Preço Sugerido (R$) *</Label>
-          <Input
-            id="price"
-            type="number"
-            step="0.01"
-            min="0"
-            value={formData.price}
-            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-            required
-            placeholder="0.00"
-          />
-        </div>
+        {serviceType === "fixed" && (
+          <div>
+            <Label htmlFor="price">Preço (R$) *</Label>
+            <Input
+              id="price"
+              type="text"
+              inputMode="decimal"
+              value={formData.price}
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^\d.,]/g, '');
+                setFormData({ ...formData, price: value });
+              }}
+              required
+              placeholder="0.00"
+            />
+          </div>
+        )}
       </div>
+
+      {serviceType === "variable" && (
+        <ServiceVariationForm variations={variations} onChange={setVariations} />
+      )}
 
       <div>
         <Label htmlFor="duration">Duração Estimada</Label>

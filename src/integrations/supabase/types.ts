@@ -272,7 +272,7 @@ export type Database = {
           accessed_at: string | null
           budget_id: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           user_agent: string | null
           user_id: string
         }
@@ -281,7 +281,7 @@ export type Database = {
           accessed_at?: string | null
           budget_id: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           user_agent?: string | null
           user_id: string
         }
@@ -290,7 +290,7 @@ export type Database = {
           accessed_at?: string | null
           budget_id?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           user_agent?: string | null
           user_id?: string
         }
@@ -740,9 +740,96 @@ export type Database = {
           },
         ]
       }
+      service_categories: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          description: string | null
+          estimated_profit_margin: number | null
+          icon: string | null
+          id: string
+          is_default: boolean | null
+          name: string
+          owner_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          estimated_profit_margin?: number | null
+          icon?: string | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          owner_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          estimated_profit_margin?: number | null
+          icon?: string | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          owner_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      service_variations: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          labor_cost: number
+          name: string
+          owner_id: string
+          part_cost: number
+          service_id: string
+          total_price: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          labor_cost?: number
+          name: string
+          owner_id: string
+          part_cost?: number
+          service_id: string
+          total_price?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          labor_cost?: number
+          name?: string
+          owner_id?: string
+          part_cost?: number
+          service_id?: string
+          total_price?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_variations_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       services: {
         Row: {
           category: string | null
+          category_id: string | null
           created_at: string
           description: string | null
           duration: string | null
@@ -752,10 +839,12 @@ export type Database = {
           notes: string | null
           owner_id: string
           price: number
+          service_type: string | null
           updated_at: string
         }
         Insert: {
           category?: string | null
+          category_id?: string | null
           created_at?: string
           description?: string | null
           duration?: string | null
@@ -765,10 +854,12 @@ export type Database = {
           notes?: string | null
           owner_id: string
           price?: number
+          service_type?: string | null
           updated_at?: string
         }
         Update: {
           category?: string | null
+          category_id?: string | null
           created_at?: string
           description?: string | null
           duration?: string | null
@@ -778,9 +869,18 @@ export type Database = {
           notes?: string | null
           owner_id?: string
           price?: number
+          service_type?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "services_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "service_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       store_settings: {
         Row: {
@@ -867,6 +967,10 @@ export type Database = {
         Args: { budget_id_param: string }
         Returns: string
       }
+      create_default_service_categories: {
+        Args: { user_id: string }
+        Returns: undefined
+      }
       get_budget_details_secure: {
         Args: { budget_id_param: string }
         Returns: {
@@ -936,7 +1040,7 @@ export type Database = {
         }[]
       }
       get_sales_with_profit: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           cancel_reason: string
           canceled: boolean

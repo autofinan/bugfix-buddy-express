@@ -69,7 +69,7 @@ export default function ServicesView() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setServices(data || []);
+      setServices((data as any) || []);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar serviços",

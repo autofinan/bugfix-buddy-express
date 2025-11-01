@@ -45,7 +45,7 @@ export function CategoryManager() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from("service_categories")
+        .from("service_categories" as any)
         .select("*")
         .order("is_default", { ascending: false })
         .order("name");
@@ -57,7 +57,7 @@ export function CategoryManager() {
         return;
       }
 
-      setCategories(data);
+      setCategories(data as unknown as ServiceCategory[]);
     } catch (error: any) {
       console.error("Erro ao buscar categorias:", error);
       toast({
@@ -75,7 +75,7 @@ export function CategoryManager() {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) return;
 
-      const { error } = await supabase.rpc("create_default_service_categories", {
+      const { error } = await supabase.rpc("create_default_service_categories" as any, {
         user_id: user.user.id
       });
 
@@ -92,7 +92,7 @@ export function CategoryManager() {
 
     try {
       const { error } = await supabase
-        .from("service_categories")
+        .from("service_categories" as any)
         .delete()
         .eq("id", deleteId);
 

@@ -86,20 +86,30 @@ export function BudgetForm({ open, onOpenChange, onSave, budgetToEdit }: BudgetF
     try {
       const { data: budgetItems, error } = await supabase
         .from("budget_items")
-        .select(`
-          product_id,
-          quantity,
-          unit_price,
-          total_price,
-          products(name)
-        `)
+        .select("product_id, quantity, unit_price, total_price")
         .eq("budget_id", budget.id);
 
       if (error) throw error;
 
+      if (!budgetItems) {
+        setItems([]);
+        return;
+      }
+
+      // Buscar dados dos produtos separadamente
+      const productIds = budgetItems.map(item => item.product_id);
+      const { data: products, error: productsError } = await supabase
+        .from("products")
+        .select("id, name")
+        .in("id", productIds);
+
+      if (productsError) throw productsError;
+
+      const productsMap = new Map(products?.map(p => [p.id, p.name]) || []);
+
       const formattedItems: BudgetItem[] = budgetItems.map((item: any) => ({
         product_id: item.product_id,
-        product_name: item.products?.name || "Produto",
+        product_name: productsMap.get(item.product_id) || "Produto",
         quantity: item.quantity,
         unit_price: item.unit_price,
         total_price: item.total_price

@@ -103,7 +103,7 @@ export function CategoryForm({ open, onOpenChange, onSave, categoryToEdit }: Cat
 
       if (categoryToEdit) {
         const { error } = await supabase
-          .from("service_categories")
+          .from("service_categories" as any)
           .update(categoryData)
           .eq("id", categoryToEdit.id);
 
@@ -115,7 +115,7 @@ export function CategoryForm({ open, onOpenChange, onSave, categoryToEdit }: Cat
         });
       } else {
         const { error } = await supabase
-          .from("service_categories")
+          .from("service_categories" as any)
           .insert(categoryData);
 
         if (error) throw error;
