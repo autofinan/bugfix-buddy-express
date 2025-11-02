@@ -98,7 +98,7 @@ export default function CategoriesView() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Categorias</h1>
         <Button onClick={() => setShowForm(true)}>

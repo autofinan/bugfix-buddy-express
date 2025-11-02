@@ -179,7 +179,7 @@ PROD001;Produto Exemplo;Eletrônicos;199.99;120.00;7891234567890;50;10;https://e
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Cadastro em Lote</h1>
         <Button onClick={downloadTemplate} variant="outline">

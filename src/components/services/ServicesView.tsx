@@ -118,7 +118,7 @@ export default function ServicesView() {
   const inactiveServices = filteredServices.filter(s => !s.is_active);
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Serviços</h1>

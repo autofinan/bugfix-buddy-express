@@ -8,7 +8,7 @@ import { Brain, TrendingUp, PieChart, Bell } from "lucide-react";
 
 export default function FinancialAssistantView() {
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="min-h-screen container mx-auto p-6 space-y-6">
       <div className="flex items-center gap-3 mb-6">
         <Brain className="h-8 w-8 text-primary" />
         <div>

@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Search, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 interface Product {
   id: string;
@@ -25,9 +26,22 @@ export function ProductSelector({ onAddToCart }: ProductSelectorProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchProducts();
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const fetchProducts = async () => {
@@ -63,6 +77,17 @@ export function ProductSelector({ onAddToCart }: ProductSelectorProps) {
     product.barcode?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleAddToCart = (product: Product) => {
+    onAddToCart({
+      id: product.id,
+      name: product.name,
+      price: Number(product.price),
+      stock: product.stock || 0
+    });
+    setSearch("");
+    setShowDropdown(false);
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -79,69 +104,68 @@ export function ProductSelector({ onAddToCart }: ProductSelectorProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div ref={wrapperRef} className="relative space-y-4">
       <div className="relative">
-        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
         <Input
-          placeholder="Buscar por nome, SKU ou código de barras..."
-          className="pl-10"
+          placeholder="Buscar produtos..."
+          className="pr-10"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          onFocus={() => setShowDropdown(true)}
+          onClick={() => setShowDropdown(true)}
         />
       </div>
 
-      <div className="space-y-2 max-h-96 overflow-y-auto">
-        {filteredProducts.length === 0 ? (
-          <div className="text-center py-8">
-            <Package className="mx-auto h-12 w-12 text-muted-foreground" />
-            <p className="mt-2 text-muted-foreground">
-              {search ? "Nenhum produto encontrado" : "Nenhum produto cadastrado"}
-            </p>
-          </div>
-        ) : (
-          filteredProducts.map((product) => (
-            <Card key={product.id} className="p-3">
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium truncate">{product.name}</h3>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>R$ {product.price.toFixed(2)}</span>
-                    <span>•</span>
-                    <Badge variant="secondary">
-                      Estoque: {product.stock}
-                    </Badge>
-                    {product.categories && (
-                      <>
-                        <span>•</span>
-                        <span>{product.categories.name}</span>
-                      </>
+      {showDropdown && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-lg shadow-lg z-50 max-h-[400px] overflow-y-auto">
+          {filteredProducts.length === 0 ? (
+            <div className="text-center py-8">
+              <Package className="mx-auto h-12 w-12 text-muted-foreground" />
+              <p className="mt-2 text-muted-foreground">
+                {search ? "Nenhum produto encontrado" : "Nenhum produto cadastrado"}
+              </p>
+            </div>
+          ) : (
+            filteredProducts.map((product) => (
+              <div
+                key={product.id}
+                onClick={() => handleAddToCart(product)}
+                className={cn(
+                  "p-3 hover:bg-accent cursor-pointer transition-colors border-b last:border-0",
+                  (!product.stock || product.stock <= 0) && "opacity-50 cursor-not-allowed"
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium truncate">{product.name}</h3>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>R$ {product.price.toFixed(2)}</span>
+                      <span>•</span>
+                      <Badge variant="secondary">
+                        Estoque: {product.stock}
+                      </Badge>
+                      {product.categories && (
+                        <>
+                          <span>•</span>
+                          <span>{product.categories.name}</span>
+                        </>
+                      )}
+                    </div>
+                    {(product.sku || product.barcode) && (
+                      <div className="text-xs text-muted-foreground">
+                        {product.sku && <span>SKU: {product.sku}</span>}
+                        {product.sku && product.barcode && <span> • </span>}
+                        {product.barcode && <span>Código: {product.barcode}</span>}
+                      </div>
                     )}
                   </div>
-                  {(product.sku || product.barcode) && (
-                    <div className="text-xs text-muted-foreground">
-                      {product.sku && <span>SKU: {product.sku}</span>}
-                      {product.sku && product.barcode && <span> • </span>}
-                      {product.barcode && <span>Código: {product.barcode}</span>}
-                    </div>
-                  )}
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => onAddToCart({
-                    id: product.id,
-                    name: product.name,
-                    price: Number(product.price),
-                    stock: product.stock || 0
-                  })}
-                  disabled={!product.stock || product.stock <= 0}
-                >
-                  Adicionar
-                </Button>
               </div>
-            </Card>
-          ))
-        )}
-      </div>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }

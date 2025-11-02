@@ -6,7 +6,7 @@ import { GeneralSettings } from "@/components/settings/GeneralSettings";
 
 export default function Settings() {
   return (
-    <div className="space-y-6 p-6">
+    <div className="min-h-screen space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">

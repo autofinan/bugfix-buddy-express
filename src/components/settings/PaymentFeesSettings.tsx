@@ -22,17 +22,29 @@ const paymentMethodLabels: Record<string, string> = {
   credito_parcelado_4x: "Cartão de Crédito (4x)",
   credito_parcelado_5x: "Cartão de Crédito (5x)",
   credito_parcelado_6x: "Cartão de Crédito (6x)",
+  credito_parcelado_7x: "Cartão de Crédito (7x)",
+  credito_parcelado_8x: "Cartão de Crédito (8x)",
+  credito_parcelado_9x: "Cartão de Crédito (9x)",
+  credito_parcelado_10x: "Cartão de Crédito (10x)",
+  credito_parcelado_11x: "Cartão de Crédito (11x)",
+  credito_parcelado_12x: "Cartão de Crédito (12x)",
 };
 
 export function PaymentFeesSettings() {
   const [fees, setFees] = useState<Record<string, number>>({
     debito: 2.5,
     credito_vista: 3.5,
-    credito_parcelado_2x: 4.5,
-    credito_parcelado_3x: 5.0,
-    credito_parcelado_4x: 5.5,
-    credito_parcelado_5x: 6.0,
-    credito_parcelado_6x: 6.5,
+    credito_parcelado_2x: 4.0,
+    credito_parcelado_3x: 4.0,
+    credito_parcelado_4x: 4.5,
+    credito_parcelado_5x: 5.0,
+    credito_parcelado_6x: 5.5,
+    credito_parcelado_7x: 6.0,
+    credito_parcelado_8x: 6.5,
+    credito_parcelado_9x: 7.0,
+    credito_parcelado_10x: 7.5,
+    credito_parcelado_11x: 8.0,
+    credito_parcelado_12x: 8.5,
   });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -179,11 +191,12 @@ export function PaymentFeesSettings() {
         </div>
 
         <div className="bg-muted/50 p-4 rounded-lg space-y-2">
-          <h4 className="font-medium text-sm">Como funciona:</h4>
+          <h4 className="font-medium text-sm">💡 Como funciona:</h4>
           <ul className="text-sm text-muted-foreground space-y-1">
             <li>• As taxas são aplicadas automaticamente no PDV e na conversão de orçamentos</li>
             <li>• O valor bruto (pago pelo cliente) e o valor líquido (após taxas) são salvos</li>
-            <li>• Para crédito parcelado, a taxa varia conforme o número de parcelas</li>
+            <li>• Para crédito parcelado, a taxa varia de 1x até 12x conforme configurado</li>
+            <li>• Configure as taxas que sua máquina de cartão cobra em cada modalidade</li>
           </ul>
         </div>
       </CardContent>
