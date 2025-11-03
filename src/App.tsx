@@ -73,7 +73,7 @@ function App() {
                 <Header />
 
                 <main className="flex-1 overflow-y-auto p-6 bg-gradient-subtle">
-                  <div className="max-w-[1600px] w-full mx-auto">
+                  <div className="w-full">
                     <Routes>
                     <Route path="/" element={<Index />} />
                     <Route path="/pos" element={<POSPage />} />

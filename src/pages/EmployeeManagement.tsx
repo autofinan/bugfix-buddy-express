@@ -83,7 +83,7 @@ export default function EmployeeManagement() {
         email: inviteEmail,
         password: Math.random().toString(36).slice(-12) + 'A1!', // Senha temporária forte
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/auth`,
           data: {
             invited_as: 'employee'
           }
@@ -153,7 +153,7 @@ export default function EmployeeManagement() {
 
   if (authLoading || loading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="w-full">
         <div className="animate-pulse space-y-4">
           <div className="h-8 bg-gray-200 rounded w-1/3"></div>
           <div className="h-64 bg-gray-200 rounded"></div>
@@ -164,7 +164,7 @@ export default function EmployeeManagement() {
 
   if (!isOwner) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="w-full">
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
@@ -181,7 +181,7 @@ export default function EmployeeManagement() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="w-full space-y-6">
       <div>
         <h1 className="text-3xl font-bold mb-2">Gerenciar Funcionários</h1>
         <p className="text-muted-foreground">
