@@ -51,31 +51,7 @@ export default function EmployeeManagement() {
 
       if (error) throw error;
 
-      // Buscar emails dos usuários do auth.users via API
-      const employeesWithEmails = await Promise.all(
-        (data || []).map(async (emp) => {
-          try {
-            // Tentar buscar o email diretamente (não funciona com admin.getUserById no client)
-            // Vamos usar uma abordagem diferente: buscar da tabela profiles se existir
-            const { data: { user } } = await supabase.auth.getUser();
-            
-            // Para cada employee, vamos fazer uma query para pegar informações básicas
-            // Como não temos acesso direto ao auth.users, vamos armazenar o email no metadata
-            return {
-              ...emp,
-              email: 'Funcionário convidado' // Placeholder - o email real virá do Supabase Auth
-            };
-          } catch (error) {
-            console.error('Erro ao buscar dados do funcionário:', error);
-            return {
-              ...emp,
-              email: 'Email não disponível'
-            };
-          }
-        })
-      );
-
-      setEmployees(employeesWithEmails);
+      setEmployees(data || []);
     } catch (error: any) {
       console.error('Erro ao buscar funcionários:', error);
       toast({
