@@ -44,14 +44,22 @@ export function useAuth(): AuthData {
             .from('user_roles')
             .select('role')
             .eq('user_id', currentUser.id)
-            .single();
+            .maybeSingle();
 
           if (error) {
             console.error('Erro ao buscar role:', error);
-            // Default para owner se não encontrar role (usuários existentes)
-            setUserRole({ role: 'owner' });
+            // Aguardar um pouco e tentar novamente (pode estar sendo criado pelo trigger)
+            setTimeout(async () => {
+              const { data: retryData } = await supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', currentUser.id)
+                .maybeSingle();
+              
+              setUserRole(retryData || { role: 'employee' });
+            }, 1000);
           } else {
-            setUserRole(roleData);
+            setUserRole(roleData || { role: 'employee' });
           }
         }
       } catch (error) {
@@ -68,14 +76,16 @@ export function useAuth(): AuthData {
       if (session?.user) {
         setUser(session.user);
         // Recarregar role quando usuário mudar
-        supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .single()
-          .then(({ data }) => {
-            setUserRole(data || { role: 'owner' });
-          });
+        setTimeout(() => {
+          supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .maybeSingle()
+            .then(({ data }) => {
+              setUserRole(data || { role: 'employee' });
+            });
+        }, 500);
       } else {
         setUser(null);
         setUserRole(null);

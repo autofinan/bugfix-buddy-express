@@ -46,24 +46,43 @@ export default function EmployeeManagement() {
       const { data, error } = await supabase
         .from('user_roles')
         .select('*')
-        .eq('role', 'employee');
+        .eq('role', 'employee')
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Buscar emails dos usuários
+      // Buscar emails dos usuários do auth.users via API
       const employeesWithEmails = await Promise.all(
         (data || []).map(async (emp) => {
-          const { data: userData } = await supabase.auth.admin.getUserById(emp.user_id);
-          return {
-            ...emp,
-            email: userData?.user?.email || 'Email não encontrado'
-          };
+          try {
+            // Tentar buscar o email diretamente (não funciona com admin.getUserById no client)
+            // Vamos usar uma abordagem diferente: buscar da tabela profiles se existir
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            // Para cada employee, vamos fazer uma query para pegar informações básicas
+            // Como não temos acesso direto ao auth.users, vamos armazenar o email no metadata
+            return {
+              ...emp,
+              email: 'Funcionário convidado' // Placeholder - o email real virá do Supabase Auth
+            };
+          } catch (error) {
+            console.error('Erro ao buscar dados do funcionário:', error);
+            return {
+              ...emp,
+              email: 'Email não disponível'
+            };
+          }
         })
       );
 
       setEmployees(employeesWithEmails);
     } catch (error: any) {
       console.error('Erro ao buscar funcionários:', error);
+      toast({
+        title: "Erro ao carregar funcionários",
+        description: error.message,
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -82,42 +101,42 @@ export default function EmployeeManagement() {
     setInviting(true);
 
     try {
-      // Criar usuário no Supabase Auth
+      // Criar usuário no Supabase Auth com signUp
+      // O trigger handle_new_user_role() irá automaticamente criar a role 'employee'
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: inviteEmail,
-        password: Math.random().toString(36).slice(-12), // Senha temporária
+        password: Math.random().toString(36).slice(-12) + 'A1!', // Senha temporária forte
         options: {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
-            role: 'employee'
+            invited_as: 'employee'
           }
         }
       });
 
-      if (authError) throw authError;
-
-      if (!authData.user) {
-        throw new Error('Usuário não foi criado');
+      if (authError) {
+        // Se o erro for que o usuário já existe, informar de forma amigável
+        if (authError.message.includes('already registered')) {
+          throw new Error('Este e-mail já está cadastrado no sistema');
+        }
+        throw authError;
       }
 
-      // Adicionar role de employee
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: authData.user.id,
-          role: 'employee',
-          created_by: (await supabase.auth.getUser()).data.user?.id
-        });
-
-      if (roleError) throw roleError;
+      if (!authData.user) {
+        throw new Error('Não foi possível criar o convite');
+      }
 
       toast({
-        title: "Funcionário convidado",
-        description: `Um e-mail foi enviado para ${inviteEmail} com instruções de acesso.`,
+        title: "Funcionário convidado com sucesso",
+        description: `Um e-mail foi enviado para ${inviteEmail}. O funcionário deve confirmar o e-mail e definir uma senha para acessar o sistema.`,
       });
 
       setInviteEmail("");
-      fetchEmployees();
+      
+      // Aguardar um pouco antes de recarregar a lista para dar tempo do trigger executar
+      setTimeout(() => {
+        fetchEmployees();
+      }, 1000);
     } catch (error: any) {
       console.error('Erro ao convidar funcionário:', error);
       toast({
