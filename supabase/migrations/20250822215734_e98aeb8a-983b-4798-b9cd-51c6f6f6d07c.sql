@@ -1,0 +1,219 @@
+-- Add missing columns to categories table
+ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS slug text UNIQUE;
+
+-- Add missing columns to products table  
+ALTER TABLE public.products 
+ADD COLUMN IF NOT EXISTS sku text UNIQUE,
+ADD COLUMN IF NOT EXISTS barcode text,
+ADD COLUMN IF NOT EXISTS cost numeric,
+ADD COLUMN IF NOT EXISTS min_stock integer DEFAULT 0,
+ADD COLUMN IF NOT EXISTS image_url text,
+ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true,
+ADD COLUMN IF NOT EXISTS created_at timestamp with time zone DEFAULT now();
+
+-- Fix typo in products table
+ALTER TABLE public.products RENAME COLUMN creat_at TO created_at_old;
+UPDATE public.products SET created_at = created_at_old WHERE created_at IS NULL AND created_at_old IS NOT NULL;
+ALTER TABLE public.products DROP COLUMN created_at_old;
+
+-- Create sales table
+CREATE TABLE IF NOT EXISTS public.sales (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    date timestamp with time zone NOT NULL DEFAULT now(),
+    total numeric NOT NULL,
+    payment_method text NOT NULL CHECK (payment_method IN ('pix', 'cartao', 'dinheiro')),
+    note text,
+    created_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- Create sale_items table
+CREATE TABLE IF NOT EXISTS public.sale_items (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    sale_id uuid NOT NULL REFERENCES public.sales(id) ON DELETE CASCADE,
+    product_id bigint NOT NULL REFERENCES public.products(id) ON DELETE RESTRICT,
+    qty integer NOT NULL CHECK (qty > 0),
+    unit_price numeric NOT NULL,
+    subtotal numeric NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- Create inventory_movements table
+CREATE TABLE IF NOT EXISTS public.inventory_movements (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id bigint NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+    type text NOT NULL CHECK (type IN ('entrada', 'saida', 'ajuste', 'venda')),
+    qty integer NOT NULL,
+    note text,
+    created_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- Enable RLS on all tables
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sales ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sale_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inventory_movements ENABLE ROW LEVEL SECURITY;
+
+-- Create policies for public access (adjust based on your needs)
+CREATE POLICY "Allow all operations on categories" ON public.categories FOR ALL USING (true);
+CREATE POLICY "Allow all operations on products" ON public.products FOR ALL USING (true);
+CREATE POLICY "Allow all operations on sales" ON public.sales FOR ALL USING (true);
+CREATE POLICY "Allow all operations on sale_items" ON public.sale_items FOR ALL USING (true);
+CREATE POLICY "Allow all operations on inventory_movements" ON public.inventory_movements FOR ALL USING (true);
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_products_sku ON public.products(sku);
+CREATE INDEX IF NOT EXISTS idx_products_barcode ON public.products(barcode);
+CREATE INDEX IF NOT EXISTS idx_products_name ON public.products(name);
+CREATE INDEX IF NOT EXISTS idx_products_category ON public.products(category_id);
+CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON public.sale_items(sale_id);
+CREATE INDEX IF NOT EXISTS idx_sale_items_product ON public.sale_items(product_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_movements_product ON public.inventory_movements(product_id);
+
+-- Function to search products by text (name, sku, barcode)
+CREATE OR REPLACE FUNCTION search_products(search_text text)
+RETURNS TABLE(
+    id bigint,
+    name text,
+    sku text,
+    barcode text,
+    price numeric,
+    stock integer,
+    category_name text
+) 
+LANGUAGE sql STABLE
+AS $$
+    SELECT 
+        p.id,
+        p.name,
+        p.sku,
+        p.barcode,
+        p.price,
+        p.stock,
+        c.name as category_name
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    WHERE p.is_active = true
+    AND (
+        p.name ILIKE '%' || search_text || '%' OR
+        p.sku ILIKE '%' || search_text || '%' OR
+        p.barcode ILIKE '%' || search_text || '%'
+    )
+    ORDER BY p.name;
+$$;
+
+-- Function to insert products in batch
+CREATE OR REPLACE FUNCTION insert_products_batch(products_data jsonb)
+RETURNS TABLE(success boolean, message text, product_id bigint)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    product_record jsonb;
+    category_id_val bigint;
+    new_product_id bigint;
+BEGIN
+    FOR product_record IN SELECT * FROM jsonb_array_elements(products_data)
+    LOOP
+        -- Get or create category
+        SELECT id INTO category_id_val 
+        FROM categories 
+        WHERE name = (product_record->>'category');
+        
+        IF category_id_val IS NULL THEN
+            INSERT INTO categories (name, slug) 
+            VALUES (
+                product_record->>'category',
+                lower(replace(product_record->>'category', ' ', '-'))
+            )
+            RETURNING id INTO category_id_val;
+        END IF;
+        
+        -- Insert product
+        BEGIN
+            INSERT INTO products (
+                name, sku, barcode, category_id, price, cost, 
+                stock, min_stock, image_url, is_active
+            ) VALUES (
+                product_record->>'name',
+                product_record->>'sku',
+                NULLIF(product_record->>'barcode', ''),
+                category_id_val,
+                (product_record->>'price')::numeric,
+                (product_record->>'cost')::numeric,
+                (product_record->>'stock')::integer,
+                (product_record->>'min_stock')::integer,
+                NULLIF(product_record->>'image_url', ''),
+                true
+            )
+            RETURNING id INTO new_product_id;
+            
+            RETURN QUERY SELECT true, 'Success'::text, new_product_id;
+            
+        EXCEPTION WHEN OTHERS THEN
+            RETURN QUERY SELECT false, SQLERRM::text, NULL::bigint;
+        END;
+    END LOOP;
+END;
+$$;
+
+-- Function to process sale and update stock
+CREATE OR REPLACE FUNCTION process_sale(
+    sale_total numeric,
+    payment_method_val text,
+    sale_note text,
+    items jsonb
+)
+RETURNS TABLE(success boolean, message text, sale_id uuid)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    new_sale_id uuid;
+    item_record jsonb;
+    current_stock integer;
+BEGIN
+    -- Create sale
+    INSERT INTO sales (total, payment_method, note)
+    VALUES (sale_total, payment_method_val, sale_note)
+    RETURNING id INTO new_sale_id;
+    
+    -- Process each item
+    FOR item_record IN SELECT * FROM jsonb_array_elements(items)
+    LOOP
+        -- Check stock availability
+        SELECT stock INTO current_stock 
+        FROM products 
+        WHERE id = (item_record->>'product_id')::bigint;
+        
+        IF current_stock < (item_record->>'qty')::integer THEN
+            RETURN QUERY SELECT false, 'Estoque insuficiente para produto ID: ' || (item_record->>'product_id'), new_sale_id;
+            RETURN;
+        END IF;
+        
+        -- Insert sale item
+        INSERT INTO sale_items (sale_id, product_id, qty, unit_price, subtotal)
+        VALUES (
+            new_sale_id,
+            (item_record->>'product_id')::bigint,
+            (item_record->>'qty')::integer,
+            (item_record->>'unit_price')::numeric,
+            (item_record->>'subtotal')::numeric
+        );
+        
+        -- Update product stock
+        UPDATE products 
+        SET stock = stock - (item_record->>'qty')::integer
+        WHERE id = (item_record->>'product_id')::bigint;
+        
+        -- Record inventory movement
+        INSERT INTO inventory_movements (product_id, type, qty, note)
+        VALUES (
+            (item_record->>'product_id')::bigint,
+            'venda',
+            -(item_record->>'qty')::integer,
+            'Venda ID: ' || new_sale_id
+        );
+    END LOOP;
+    
+    RETURN QUERY SELECT true, 'Venda processada com sucesso'::text, new_sale_id;
+END;
+$$;
