@@ -86,11 +86,13 @@ serve(async (req) => {
     // Criar role de employee
     const { error: roleInsertError } = await supabaseAdmin
       .from('user_roles')
-      .insert({
+      .upsert({
         user_id: newUser.user.id,
         role: 'employee',
         email: email,
         created_by: user.id
+      }, {
+        onConflict: 'user_id,role'
       })
 
     if (roleInsertError) {
