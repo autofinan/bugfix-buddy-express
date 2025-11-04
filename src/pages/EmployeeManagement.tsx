@@ -31,8 +31,10 @@ export default function EmployeeManagement() {
   const { isOwner, loading: authLoading } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviting, setInviting] = useState(false);
+  const [email, setEmail] = useState("");
+  const [tempPassword, setTempPassword] = useState("");
+  const [name, setName] = useState("");
+  const [creating, setCreating] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -64,64 +66,72 @@ export default function EmployeeManagement() {
     }
   };
 
-  const handleInviteEmployee = async () => {
-    if (!inviteEmail.trim()) {
+  const handleCreateEmployee = async () => {
+    if (!email.trim() || !tempPassword.trim() || !name.trim()) {
       toast({
         title: "Erro",
-        description: "Digite um e-mail válido",
+        description: "Preencha todos os campos",
         variant: "destructive"
       });
       return;
     }
 
-    setInviting(true);
+    if (tempPassword.length < 6) {
+      toast({
+        title: "Erro",
+        description: "A senha deve ter no mínimo 6 caracteres",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setCreating(true);
 
     try {
-      // Criar usuário no Supabase Auth com signUp
-      // O trigger handle_new_user_role() irá automaticamente criar a role 'employee'
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: inviteEmail,
-        password: Math.random().toString(36).slice(-12) + 'A1!', // Senha temporária forte
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth`,
-          data: {
-            invited_as: 'employee'
-          }
-        }
-      });
-
-      if (authError) {
-        // Se o erro for que o usuário já existe, informar de forma amigável
-        if (authError.message.includes('already registered')) {
-          throw new Error('Este e-mail já está cadastrado no sistema');
-        }
-        throw authError;
-      }
-
-      if (!authData.user) {
-        throw new Error('Não foi possível criar o convite');
-      }
-
-      toast({
-        title: "Funcionário convidado com sucesso",
-        description: `Um e-mail foi enviado para ${inviteEmail}. O funcionário deve confirmar o e-mail e definir uma senha para acessar o sistema.`,
-      });
-
-      setInviteEmail("");
+      const { data: { session } } = await supabase.auth.getSession();
       
-      // Aguardar um pouco antes de recarregar a lista para dar tempo do trigger executar
-      setTimeout(() => {
-        fetchEmployees();
-      }, 1000);
-    } catch (error: any) {
-      console.error('Erro ao convidar funcionário:', error);
+      if (!session) {
+        throw new Error('Você precisa estar autenticado');
+      }
+
+      const response = await fetch('https://rllpfnmhelrnombjyiuz.supabase.co/functions/v1/create-employee', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          password: tempPassword,
+          name: name.trim()
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao criar funcionário');
+      }
+
       toast({
-        title: "Erro ao convidar",
-        description: error.message || "Não foi possível enviar o convite",
+        title: "Funcionário criado com sucesso",
+        description: `${name} foi criado. Passe as credenciais para ele fazer login.`,
+      });
+
+      setEmail("");
+      setTempPassword("");
+      setName("");
+      
+      fetchEmployees();
+    } catch (error: any) {
+      console.error('Erro ao criar funcionário:', error);
+      toast({
+        title: "Erro ao criar funcionário",
+        description: error.message || "Não foi possível criar o funcionário",
         variant: "destructive"
       });
     } finally {
-      setInviting(false);
+      setCreating(false);
     }
   };
 
@@ -181,7 +191,7 @@ export default function EmployeeManagement() {
   }
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-6 min-h-screen">
       <div>
         <h1 className="text-3xl font-bold mb-2">Gerenciar Funcionários</h1>
         <p className="text-muted-foreground">
@@ -197,27 +207,58 @@ export default function EmployeeManagement() {
             Adicionar Novo Funcionário
           </CardTitle>
           <CardDescription>
-            Digite o e-mail do funcionário. Um convite será enviado para criar a conta.
+            Crie as credenciais de acesso para o funcionário.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <Label htmlFor="email">E-mail do Funcionário</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="funcionario@exemplo.com"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleInviteEmployee()}
-              />
-            </div>
-            <div className="flex items-end">
-              <Button onClick={handleInviteEmployee} disabled={inviting}>
-                {inviting ? "Enviando..." : "Convidar"}
-              </Button>
-            </div>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="name">Nome Completo</Label>
+            <Input
+              id="name"
+              placeholder="João Silva"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="email">E-mail</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="funcionario@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="password">Senha Temporária</Label>
+            <Input
+              id="password"
+              type="text"
+              placeholder="Crie uma senha temporária"
+              value={tempPassword}
+              onChange={(e) => setTempPassword(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Mínimo 6 caracteres. Passe essa senha para o funcionário trocar no primeiro acesso.
+            </p>
+          </div>
+          
+          <Button 
+            onClick={handleCreateEmployee}
+            disabled={!email || !tempPassword || !name || tempPassword.length < 6 || creating}
+            className="w-full"
+          >
+            {creating ? "Criando..." : "Criar Funcionário"}
+          </Button>
+          
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              💡 <strong>Importante:</strong> Anote ou envie as credenciais para o funcionário por WhatsApp, SMS ou pessoalmente.
+              Ele poderá trocar a senha no primeiro acesso.
+            </p>
           </div>
         </CardContent>
       </Card>

@@ -258,7 +258,7 @@ const Index: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 min-h-screen">
       {/* Page Title */}
       <div className="flex items-center justify-between">
         <div>

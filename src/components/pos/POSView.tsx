@@ -115,7 +115,7 @@ export default function POSView() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-h-screen">
       {/* Header com título e botão de limpar carrinho */}
       <div className="flex items-center justify-between">
         <div>
