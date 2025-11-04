@@ -1093,6 +1093,7 @@ export type Database = {
           valid_until: string
         }[]
       }
+      get_my_owner_id: { Args: never; Returns: string }
       get_sales_with_profit: {
         Args: never
         Returns: {
