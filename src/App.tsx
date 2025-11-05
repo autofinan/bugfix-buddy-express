@@ -60,50 +60,49 @@ function App() {
         <Toaster />
         <Sonner />
 
-        <SidebarProvider>
-          {user ? (
-            <div className="flex h-screen">
-              {/* Sidebar fixa */}
-              <aside className="w-64 border-r bg-sidebar">
-                <AppSidebar />
-              </aside>
+        {user ? (
+          <SidebarProvider>
+            <div className="flex min-h-screen w-full bg-gradient-subtle">
+              {/* Sidebar - colapsável no mobile */}
+              <AppSidebar />
 
               {/* Área principal */}
-              <div className="flex-1 flex flex-col">
+              <div className="flex flex-1 flex-col w-full min-w-0">
                 <Header />
 
-                <main className="flex-1 overflow-y-auto p-6 bg-gradient-subtle">
-                  <div className="w-full">
+                {/* main responsivo */}
+                <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 w-full">
+                  <div className="max-w-full mx-auto">
                     <Routes>
-                    <Route path="/" element={<Index />} />
-                    <Route path="/pos" element={<POSPage />} />
-                    <Route path="/products" element={<ProductsPage />} />
-                    <Route path="/bulk-products" element={<BulkProductsPage />} />
-                    <Route path="/import-csv" element={<ImportCSVPage />} />
-                    <Route path="/services" element={<ServicesView />} />
-                    <Route path="/financial-assistant" element={<FinancialAssistantView />} />
-                    <Route path="/budgets" element={<BudgetsPage />} />
-                    <Route path="/stock" element={<StockPage />} />
-                    <Route path="/expenses" element={<ExpensesPage />} />
-                    <Route path="/sales" element={<SalesPage />} />
-                    <Route path="/reports" element={<ReportsPage />} />
-                    <Route path="/categories" element={<CategoriesPage />} />
-                    <Route path="/stock-adjustment" element={<StockAdjustmentPage />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="/employees" element={<EmployeeManagement />} />
-                    <Route path="*" element={<NotFound />} />
+                      <Route path="/" element={<Index />} />
+                      <Route path="/pos" element={<POSPage />} />
+                      <Route path="/products" element={<ProductsPage />} />
+                      <Route path="/bulk-products" element={<BulkProductsPage />} />
+                      <Route path="/import-csv" element={<ImportCSVPage />} />
+                      <Route path="/services" element={<ServicesView />} />
+                      <Route path="/financial-assistant" element={<FinancialAssistantView />} />
+                      <Route path="/budgets" element={<BudgetsPage />} />
+                      <Route path="/stock" element={<StockPage />} />
+                      <Route path="/expenses" element={<ExpensesPage />} />
+                      <Route path="/sales" element={<SalesPage />} />
+                      <Route path="/reports" element={<ReportsPage />} />
+                      <Route path="/categories" element={<CategoriesPage />} />
+                      <Route path="/stock-adjustment" element={<StockAdjustmentPage />} />
+                      <Route path="/settings" element={<Settings />} />
+                      <Route path="/employees" element={<EmployeeManagement />} />
+                      <Route path="*" element={<NotFound />} />
                     </Routes>
                   </div>
                 </main>
               </div>
             </div>
-          ) : (
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="*" element={<Navigate to="/auth" replace />} />
-            </Routes>
-          )}
-        </SidebarProvider>
+          </SidebarProvider>
+        ) : (
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route path="*" element={<Navigate to="/auth" replace />} />
+          </Routes>
+        )}
       </TooltipProvider>
     </QueryClientProvider>
   );
