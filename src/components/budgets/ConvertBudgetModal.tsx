@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,7 +23,7 @@ interface ConvertBudgetModalProps {
   budget: Budget | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (paymentMethod: string, notes: string) => void;
+  onConfirm: (paymentMethod: string, notes: string, saleDate: string) => void;
   loading: boolean;
 }
 
@@ -44,15 +45,17 @@ export function ConvertBudgetModal({
 }: ConvertBudgetModalProps) {
   const [paymentMethod, setPaymentMethod] = useState("");
   const [notes, setNotes] = useState("");
+  const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]); // Hoje como padrão
 
   const handleConfirm = () => {
     if (!paymentMethod) return;
-    onConfirm(paymentMethod, notes);
+    onConfirm(paymentMethod, notes, saleDate);
   };
 
   const resetForm = () => {
     setPaymentMethod("");
     setNotes("");
+    setSaleDate(new Date().toISOString().split('T')[0]);
   };
 
   const handleOpenChange = (newOpen: boolean) => {
@@ -102,6 +105,21 @@ export function ConvertBudgetModal({
               </div>
             </CardContent>
           </Card>
+
+          {/* Data da Venda */}
+          <div className="space-y-2">
+            <Label htmlFor="saleDate">Data da Venda</Label>
+            <Input
+              id="saleDate"
+              type="date"
+              value={saleDate}
+              onChange={(e) => setSaleDate(e.target.value)}
+              max={new Date().toISOString().split('T')[0]}
+            />
+            <p className="text-xs text-muted-foreground">
+              Por padrão, usa a data de hoje. Altere se a venda foi em outro dia.
+            </p>
+          </div>
 
           {/* Forma de Pagamento */}
           <div className="space-y-2">

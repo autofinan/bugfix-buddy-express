@@ -45,10 +45,22 @@ export default function EmployeeManagement() {
 
   const fetchEmployees = async () => {
     try {
+      setLoading(true);
+      
+      // Buscar ID do owner atual
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+      
+      // Buscar apenas funcionários criados por este owner
       const { data, error } = await supabase
         .from('user_roles')
         .select('*')
         .eq('role', 'employee')
+        .eq('created_by', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -94,6 +106,13 @@ export default function EmployeeManagement() {
         throw new Error('Você precisa estar autenticado');
       }
 
+      // Buscar ID do owner atual
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
+      if (!currentUser) {
+        throw new Error('Usuário não autenticado');
+      }
+
       const response = await fetch('https://rllpfnmhelrnombjyiuz.supabase.co/functions/v1/create-employee', {
         method: 'POST',
         headers: {
@@ -103,7 +122,8 @@ export default function EmployeeManagement() {
         body: JSON.stringify({
           email: email.trim(),
           password: tempPassword,
-          name: name.trim()
+          name: name.trim(),
+          created_by: currentUser.id
         })
       });
 

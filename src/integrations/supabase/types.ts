@@ -187,6 +187,7 @@ export type Database = {
           cancel_reason: string | null
           canceled_at: string | null
           canceled_by: string | null
+          converted_at: string | null
           converted_sale_id: string | null
           created_at: string
           customer_email: string | null
@@ -207,6 +208,7 @@ export type Database = {
           cancel_reason?: string | null
           canceled_at?: string | null
           canceled_by?: string | null
+          converted_at?: string | null
           converted_sale_id?: string | null
           created_at?: string
           customer_email?: string | null
@@ -227,6 +229,7 @@ export type Database = {
           cancel_reason?: string | null
           canceled_at?: string | null
           canceled_by?: string | null
+          converted_at?: string | null
           converted_sale_id?: string | null
           created_at?: string
           customer_email?: string | null

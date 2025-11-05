@@ -117,7 +117,7 @@ export default function BudgetsView() {
     }
   };
 
-  const handleConvertToSale = async (paymentMethod: string, notes: string) => {
+  const handleConvertToSale = async (paymentMethod: string, notes: string, saleDate: string) => {
     if (!budgetToConvert) return;
     
     setConvertingBudgets(prev => new Set(prev).add(budgetToConvert.id));
@@ -131,7 +131,7 @@ export default function BudgetsView() {
         throw new Error('Usuário não autenticado');
       }
 
-      // Criar a venda primeiro
+      // Criar a venda primeiro com a data escolhida
       const { data: sale, error: saleError } = await supabase
         .from("sales")
         .insert({
@@ -141,7 +141,7 @@ export default function BudgetsView() {
           discount_value: budgetToConvert.discount_value,
           payment_method: paymentMethod,
           note: notes || `Convertido do orçamento: ${budgetToConvert.id}`,
-          date: new Date().toISOString()
+          date: new Date(saleDate + 'T12:00:00').toISOString() // Usar data escolhida
         })
         .select()
         .single();

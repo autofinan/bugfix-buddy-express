@@ -16,6 +16,7 @@ import FinancialAssistantView from "./components/financial-assistant/FinancialAs
 
 import Header from "./components/layout/Header";
 import { AppSidebar } from "./components/layout/AppSidebar";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 // Produtos
 import ProductsPage from "./components/products/ProductsView";
@@ -80,16 +81,51 @@ function App() {
                       <Route path="/bulk-products" element={<BulkProductsPage />} />
                       <Route path="/import-csv" element={<ImportCSVPage />} />
                       <Route path="/services" element={<ServicesView />} />
-                      <Route path="/financial-assistant" element={<FinancialAssistantView />} />
+                      <Route 
+                        path="/financial-assistant" 
+                        element={
+                          <ProtectedRoute requiredPermission="canViewFinancialAssistant">
+                            <FinancialAssistantView />
+                          </ProtectedRoute>
+                        } 
+                      />
                       <Route path="/budgets" element={<BudgetsPage />} />
                       <Route path="/stock" element={<StockPage />} />
-                      <Route path="/expenses" element={<ExpensesPage />} />
+                      <Route 
+                        path="/expenses" 
+                        element={
+                          <ProtectedRoute requiredPermission="canViewExpenses">
+                            <ExpensesPage />
+                          </ProtectedRoute>
+                        } 
+                      />
                       <Route path="/sales" element={<SalesPage />} />
-                      <Route path="/reports" element={<ReportsPage />} />
+                      <Route 
+                        path="/reports" 
+                        element={
+                          <ProtectedRoute requiredPermission="canViewReports">
+                            <ReportsPage />
+                          </ProtectedRoute>
+                        } 
+                      />
                       <Route path="/categories" element={<CategoriesPage />} />
                       <Route path="/stock-adjustment" element={<StockAdjustmentPage />} />
-                      <Route path="/settings" element={<Settings />} />
-                      <Route path="/employees" element={<EmployeeManagement />} />
+                      <Route 
+                        path="/settings" 
+                        element={
+                          <ProtectedRoute requiredPermission="canAccessSettings">
+                            <Settings />
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/employees" 
+                        element={
+                          <ProtectedRoute requireOwner>
+                            <EmployeeManagement />
+                          </ProtectedRoute>
+                        } 
+                      />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </div>

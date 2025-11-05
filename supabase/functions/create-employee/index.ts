@@ -50,7 +50,7 @@ serve(async (req) => {
       )
     }
 
-    const { email, password, name } = await req.json()
+    const { email, password, name, created_by } = await req.json()
 
     if (!email || !password || !name) {
       return new Response(
