@@ -11,6 +11,9 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
+import DRE from "./pages/reports/DRE";
+import CashFlow from "./pages/reports/CashFlow";
+import ABCCurve from "./pages/reports/ABCCurve";
 import ServicesView from "./components/services/ServicesView";
 import FinancialAssistantView from "./components/financial-assistant/FinancialAssistantView";
 
@@ -123,6 +126,30 @@ function App() {
                         element={
                           <ProtectedRoute requireOwner>
                             <EmployeeManagement />
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/reports/dre" 
+                        element={
+                          <ProtectedRoute requireOwner>
+                            <DRE />
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/reports/cashflow" 
+                        element={
+                          <ProtectedRoute requireOwner>
+                            <CashFlow />
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/reports/abc" 
+                        element={
+                          <ProtectedRoute requireOwner>
+                            <ABCCurve />
                           </ProtectedRoute>
                         } 
                       />
