@@ -135,6 +135,8 @@ const menuItems = [
         url: '/employees',
         icon: Users,
       },
+    ],
+  },
 ];
 
 const financialAssistantItems = [
@@ -162,7 +164,7 @@ const financialAssistantItems = [
     title: 'Relatórios',
     url: '/reports',
     icon: FileBarChart,
-  },
+  },a
 ];
 
 export function AppSidebar() {
