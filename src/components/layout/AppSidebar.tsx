@@ -156,7 +156,7 @@ const financialAssistantItems = [
     icon: PieChart,
   },
   {
-    title: 'Assistente Financeiro',
+    title: 'Metas',
     url: '/financial-assistant',
     icon: Target,
   },
