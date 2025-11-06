@@ -31,6 +31,8 @@ import {
   Brain,
   TrendingUp,
   Users,
+  Wallet,
+  PieChart,
 } from 'lucide-react';
 
 const menuItems = [
@@ -111,6 +113,21 @@ const menuItems = [
         title: 'Relatórios',
         url: '/reports',
         icon: BarChart3,
+      },
+      {
+        title: 'DRE',
+        url: '/reports/dre',
+        icon: TrendingUp,
+      },
+      {
+        title: 'Fluxo de Caixa',
+        url: '/reports/cashflow',
+        icon: Wallet,
+      },
+      {
+        title: 'Curva ABC',
+        url: '/reports/abc',
+        icon: PieChart,
       },
       {
         title: 'Assistente Financeiro',
