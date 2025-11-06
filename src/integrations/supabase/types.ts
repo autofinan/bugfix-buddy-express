@@ -414,6 +414,39 @@ export type Database = {
           },
         ]
       }
+      monthly_goals: {
+        Row: {
+          created_at: string | null
+          id: string
+          month: string
+          owner_id: string
+          profit_goal: number | null
+          revenue_goal: number | null
+          sales_count_goal: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          month: string
+          owner_id: string
+          profit_goal?: number | null
+          revenue_goal?: number | null
+          sales_count_goal?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          month?: string
+          owner_id?: string
+          profit_goal?: number | null
+          revenue_goal?: number | null
+          sales_count_goal?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       payment_fees: {
         Row: {
           created_at: string | null
@@ -1016,6 +1049,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_abc_curve: {
+        Args: { p_end_date: string; p_owner_id: string; p_start_date: string }
+        Returns: Json
+      }
+      calculate_cash_flow: {
+        Args: { p_end_date: string; p_owner_id: string; p_start_date: string }
+        Returns: Json
+      }
+      calculate_dre: {
+        Args: { p_end_date: string; p_owner_id: string; p_start_date: string }
+        Returns: Json
+      }
       cancel_sale: {
         Args: { reason?: string; sale_id_param: string }
         Returns: boolean

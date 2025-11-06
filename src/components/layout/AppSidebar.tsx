@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -13,7 +13,15 @@ import {
   SidebarHeader,
   SidebarTrigger,
   useSidebar,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
 } from '@/components/ui/sidebar';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import {
   Home,
   ShoppingCart,
@@ -33,6 +41,9 @@ import {
   Users,
   Wallet,
   PieChart,
+  ChevronRight,
+  Target,
+  FileBarChart,
 } from 'lucide-react';
 
 const menuItems = [
@@ -115,26 +126,6 @@ const menuItems = [
         icon: BarChart3,
       },
       {
-        title: 'DRE',
-        url: '/reports/dre',
-        icon: TrendingUp,
-      },
-      {
-        title: 'Fluxo de Caixa',
-        url: '/reports/cashflow',
-        icon: Wallet,
-      },
-      {
-        title: 'Curva ABC',
-        url: '/reports/abc',
-        icon: PieChart,
-      },
-      {
-        title: 'Assistente Financeiro',
-        url: '/financial-assistant',
-        icon: Brain,
-      },
-      {
         title: 'Configurações',
         url: '/settings',
         icon: Settings,
@@ -148,10 +139,45 @@ const menuItems = [
   },
 ];
 
+const financialAssistantItems = [
+  {
+    title: 'DRE',
+    url: '/reports/dre',
+    icon: TrendingUp,
+  },
+  {
+    title: 'Fluxo de Caixa',
+    url: '/reports/cashflow',
+    icon: Wallet,
+  },
+  {
+    title: 'Curva ABC',
+    url: '/reports/abc',
+    icon: PieChart,
+  },
+  {
+    title: 'Metas',
+    url: '/financial-assistant',
+    icon: Target,
+  },
+  {
+    title: 'Relatórios',
+    url: '/reports',
+    icon: FileBarChart,
+  },
+];
+
 export function AppSidebar() {
   const location = useLocation();
   const { permissions, isOwner } = useAuth();
   const { state } = useSidebar();
+  
+  // Check if any financial assistant route is active
+  const isFinancialAssistantActive = financialAssistantItems.some(
+    item => location.pathname === item.url || location.pathname.startsWith(item.url)
+  );
+  
+  const [isFinancialOpen, setIsFinancialOpen] = useState(isFinancialAssistantActive);
 
   return (
     <Sidebar collapsible="icon" className="border-r">
@@ -206,15 +232,13 @@ export function AppSidebar() {
               <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                    {group.items.map((item) => {
-                      // Filtrar itens do grupo Gestão baseado em permissões
-                      if (group.title === 'Gestão') {
-                        if (item.url === '/expenses' && !permissions.canViewExpenses) return null;
-                        if (item.url === '/reports' && !permissions.canViewReports) return null;
-                        if (item.url === '/financial-assistant' && !permissions.canViewFinancialAssistant) return null;
-                        if (item.url === '/settings' && !permissions.canAccessSettings) return null;
-                        if (item.url === '/employees' && !permissions.canAccessSettings) return null;
-                      }
+                  {group.items.map((item) => {
+                    // Filtrar itens do grupo Gestão baseado em permissões
+                    if (group.title === 'Gestão') {
+                      if (item.url === '/expenses' && !permissions.canViewExpenses) return null;
+                      if (item.url === '/settings' && !permissions.canAccessSettings) return null;
+                      if (item.url === '/employees' && !permissions.canAccessSettings) return null;
+                    }
 
                     return (
                       <SidebarMenuItem key={item.title}>
@@ -222,10 +246,10 @@ export function AppSidebar() {
                           asChild
                           isActive={location.pathname === item.url}
                         >
-                        <Link to={item.url}>
-                          <item.icon className="w-4 h-4 flex-shrink-0" />
-                          {state !== "collapsed" && <span>{item.title}</span>}
-                        </Link>
+                          <Link to={item.url}>
+                            <item.icon className="w-4 h-4 flex-shrink-0" />
+                            {state !== "collapsed" && <span>{item.title}</span>}
+                          </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     );
@@ -235,6 +259,56 @@ export function AppSidebar() {
             </SidebarGroup>
           );
         })}
+        
+        {/* Assistente Financeiro - Seção Expansível */}
+        {(isOwner || permissions.canViewFinancialAssistant || permissions.canViewReports) && (
+          <Collapsible
+            open={isFinancialOpen}
+            onOpenChange={setIsFinancialOpen}
+            className="group/collapsible"
+          >
+            <SidebarGroup>
+              <SidebarGroupLabel asChild>
+                <CollapsibleTrigger className="flex w-full items-center justify-between hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md px-2 py-1.5 text-sm font-medium transition-colors">
+                  <div className="flex items-center gap-2">
+                    <Brain className="h-4 w-4" />
+                    {state !== "collapsed" && <span>Assistente Financeiro</span>}
+                  </div>
+                  {state !== "collapsed" && (
+                    <ChevronRight className={`h-4 w-4 transition-transform ${isFinancialOpen ? 'rotate-90' : ''}`} />
+                  )}
+                </CollapsibleTrigger>
+              </SidebarGroupLabel>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {financialAssistantItems.map((item) => {
+                      // Filtrar itens baseado em permissões
+                      if (item.url === '/reports' && !permissions.canViewReports) return null;
+                      if (item.url === '/financial-assistant' && !permissions.canViewFinancialAssistant) return null;
+                      if (item.url.startsWith('/reports/') && !permissions.canViewReports) return null;
+
+                      return (
+                        <SidebarMenuItem key={item.title}>
+                          <SidebarMenuButton
+                            asChild
+                            isActive={location.pathname === item.url}
+                            className="pl-8"
+                          >
+                            <Link to={item.url}>
+                              <item.icon className="w-4 h-4 flex-shrink-0" />
+                              {state !== "collapsed" && <span>{item.title}</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      );
+                    })}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
+        )}
       </SidebarContent>
     </Sidebar>
   );
