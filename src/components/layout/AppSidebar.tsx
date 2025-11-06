@@ -135,8 +135,6 @@ const menuItems = [
         url: '/employees',
         icon: Users,
       },
-    ],
-  },
 ];
 
 const financialAssistantItems = [
@@ -156,7 +154,7 @@ const financialAssistantItems = [
     icon: PieChart,
   },
   {
-    title: 'Metas',
+    title: 'Assistente Financeiro',
     url: '/financial-assistant',
     icon: Target,
   },
