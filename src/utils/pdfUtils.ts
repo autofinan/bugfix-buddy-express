@@ -31,7 +31,12 @@ export const generateBudgetPDF = async (budget: Budget) => {
 
     // === BUSCAR CONFIGURAÇÕES DA LOJA ===
     let storeSettings = null;
-    // Configurações serão implementadas futuramente
+    try {
+      const { data } = await supabase.rpc('get_store_settings');
+      storeSettings = data;
+    } catch (error) {
+      console.warn('⚠️ Falha ao carregar configurações da loja');
+    }
 
     // === BUSCAR ITENS ===
     const { data: items } = await supabase
@@ -81,44 +86,75 @@ export const generateBudgetPDF = async (budget: Budget) => {
     const primaryRgb = hexToRgb(primaryColor);
 
     // === LOGO E CABEÇALHO ===
+    let logoLoaded = false;
+    let logoWidth = 0;
+    let logoHeight = 0;
+
+    // Tentar carregar e adicionar logo
     if (storeSettings?.logo_url) {
       try {
         const logo = await fetch(storeSettings.logo_url);
         const blob = await logo.blob();
         const reader = new FileReader();
-        reader.onloadend = () => {
-          doc.addImage(reader.result as string, 'PNG', margin, y, 25, 25);
-        };
-        reader.readAsDataURL(blob);
+
+        await new Promise((resolve) => {
+          reader.onloadend = () => {
+            try {
+              logoWidth = 28;
+              logoHeight = 28;
+              doc.addImage(reader.result as string, 'PNG', margin, y, logoWidth, logoHeight);
+              logoLoaded = true;
+            } catch (error) {
+              console.warn('⚠️ Falha ao adicionar imagem da logo.');
+            }
+            resolve(null);
+          };
+          reader.readAsDataURL(blob);
+        });
       } catch {
         console.warn('⚠️ Falha ao carregar logo.');
       }
     }
 
+    // Posição do texto baseada na presença da logo
+    const textStartX = logoLoaded ? margin + logoWidth + 5 : margin;
+    const headerRightX = pageWidth - margin;
+
+    // Nome da loja
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
+    doc.setFontSize(14);
     doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
     doc.text(
       storeSettings?.store_name || 'MINHA EMPRESA',
-      pageWidth / 2,
-      y + 10,
-      { align: 'center' }
+      textStartX,
+      y + 5
     );
 
+    // Informações de contato (telefone e CNPJ)
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(60, 60, 60);
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
 
-    let contact = '';
-    if (storeSettings?.phone) contact += storeSettings.phone;
-    if (storeSettings?.address)
-      contact += (contact ? ' | ' : '') + storeSettings.address;
-    if (storeSettings?.cnpj)
-      contact += (contact ? ' | ' : '') + `CNPJ: ${storeSettings.cnpj}`;
+    let contactY = y + 12;
 
-    if (contact) doc.text(contact, pageWidth / 2, y + 17, { align: 'center' });
+    if (storeSettings?.phone) {
+      doc.text(`Telefone: ${storeSettings.phone}`, textStartX, contactY);
+      contactY += 4;
+    }
 
-    y += 30;
+    if (storeSettings?.cnpj) {
+      doc.text(`CNPJ: ${storeSettings.cnpj}`, textStartX, contactY);
+      contactY += 4;
+    }
+
+    // Endereço em linha separada (menor)
+    if (storeSettings?.address) {
+      doc.setFontSize(7);
+      const addressLines = doc.splitTextToSize(storeSettings.address, pageWidth - 2 * margin - 10);
+      doc.text(addressLines, textStartX, contactY);
+    }
+
+    y += 32;
 
     // === LINHA DECORATIVA ===
     doc.setDrawColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
