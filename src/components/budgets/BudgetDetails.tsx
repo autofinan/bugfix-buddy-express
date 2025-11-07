@@ -2,7 +2,12 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { Download, MessageCircle } from "lucide-react";
+import { generateBudgetPDF } from "@/utils/pdfUtils";
+import { openWhatsAppWithBudget } from "@/utils/whatsappUtils";
+import { toast } from "sonner";
 
 interface Budget {
   id: string;
@@ -99,11 +104,62 @@ export function BudgetDetails({ budget, open, onOpenChange }: BudgetDetailsProps
     }
   };
 
+  const handleDownloadPDF = async () => {
+    try {
+      await generateBudgetPDF(budget);
+      toast.success("PDF gerado com sucesso!");
+    } catch (error) {
+      toast.error("Erro ao gerar PDF");
+      console.error(error);
+    }
+  };
+
+  const handleSendWhatsApp = () => {
+    if (!budget.customer_phone) {
+      toast.error("Cliente não possui telefone cadastrado");
+      return;
+    }
+
+    const whatsappItems = items.map(item => ({
+      product_name: item.products.name,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      total_price: item.total_price,
+    }));
+
+    openWhatsAppWithBudget(budget.customer_phone, budget, whatsappItems);
+    toast.success("Abrindo WhatsApp...");
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Detalhes do Orçamento</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>Detalhes do Orçamento</DialogTitle>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadPDF}
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                PDF
+              </Button>
+              {budget.customer_phone && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleSendWhatsApp}
+                  className="gap-2 bg-[#25D366] hover:bg-[#20BA5A] text-white"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  WhatsApp
+                </Button>
+              )}
+            </div>
+          </div>
         </DialogHeader>
 
         <div className="space-y-6">

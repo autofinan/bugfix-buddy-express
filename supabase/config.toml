@@ -1,1 +1,7 @@
 project_id = "rllpfnmhelrnombjyiuz"
+
+[functions.financial-chat]
+verify_jwt = true
+
+[functions.create-employee]
+verify_jwt = true

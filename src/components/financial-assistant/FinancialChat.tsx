@@ -50,10 +50,11 @@ export function FinancialChat() {
   };
 
   const quickQuestions = [
-    "Gastei muito esse mês?",
-    "Qual categoria mais lucra?",
-    "Como aumentar meu lucro?",
-    "Estou no caminho certo?"
+    "Como estão minhas finanças?",
+    "Qual meu ponto de equilíbrio?",
+    "Dicas para economizar",
+    "Análise de sazonalidade",
+    "Projeção próximo mês"
   ];
 
   const formatCurrency = (value: number) => {
@@ -63,67 +64,90 @@ export function FinancialChat() {
     }).format(value);
   };
 
-  const generateResponse = (question: string): string => {
+  const streamAIResponse = async (userMessage: string) => {
     if (!financialData) {
       return "Ainda estou carregando seus dados financeiros. Aguarde um momento...";
     }
 
-    const lowerQuestion = question.toLowerCase();
-
-    // Análise de gastos
-    if (lowerQuestion.includes("gastei") || lowerQuestion.includes("gasto")) {
-      const totalGasto = financialData.custos + financialData.despesas;
-      const percentualGasto = financialData.receita > 0 
-        ? (totalGasto / financialData.receita) * 100 
-        : 0;
-
-      if (percentualGasto > 70) {
-        return `⚠️ Sim, seus gastos estão elevados. Você gastou ${formatCurrency(totalGasto)} (${percentualGasto.toFixed(0)}% da receita). \n\n💡 Recomendação: Revise despesas fixas e negocie com fornecedores para reduzir custos em pelo menos 10%.`;
-      } else {
-        return `✅ Seus gastos estão controlados! Você gastou ${formatCurrency(totalGasto)} (${percentualGasto.toFixed(0)}% da receita). Continue assim!`;
-      }
-    }
-
-    // Categorias que mais lucram
-    if (lowerQuestion.includes("categoria") || lowerQuestion.includes("lucra")) {
-      const topReceitas = financialData.categorias_top.filter(c => c.type === "receita");
-      if (topReceitas.length === 0) {
-        return "Ainda não tenho dados suficientes sobre suas vendas por categoria.";
-      }
-
-      const top = topReceitas[0];
-      return `🏆 A categoria que mais vende é "${top.name}" com ${formatCurrency(top.value)} (${top.percentage.toFixed(0)}% do total).\n\n💡 Dica: Invista mais marketing nesta categoria para maximizar seus lucros.`;
-    }
-
-    // Como aumentar lucro
-    if (lowerQuestion.includes("aumentar") || lowerQuestion.includes("melhorar") || lowerQuestion.includes("lucro")) {
-      const sugestoes = [];
+    try {
+      const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/financial-chat`;
       
-      if (financialData.margem < 25) {
-        sugestoes.push("• Aumente seus preços em 5-8% — a maioria dos clientes aceita");
-      }
-      
-      if (financialData.despesas / financialData.receita > 0.4) {
-        sugestoes.push("• Reduza despesas fixas em 10% (renegocie contratos)");
+      const response = await fetch(CHAT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          messages: messages
+            .filter(m => m.role !== "assistant" || m !== messages[0])
+            .concat([{ role: "user", content: userMessage }]),
+          financialData,
+        }),
+      });
+
+      if (!response.ok || !response.body) {
+        if (response.status === 429) {
+          throw new Error("Limite de requisições excedido. Tente novamente em alguns segundos.");
+        }
+        if (response.status === 402) {
+          throw new Error("Créditos da IA esgotados. Entre em contato com o suporte.");
+        }
+        throw new Error("Falha ao conectar com a IA");
       }
 
-      sugestoes.push("• Foque nos produtos com maior margem de lucro");
-      sugestoes.push("• Elimine produtos que vendem pouco e dão pouco lucro");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedText = "";
+      let buffer = "";
 
-      return `💰 Para aumentar seu lucro:\n\n${sugestoes.join("\n")}\n\n📊 Impacto estimado: +15-20% no lucro líquido`;
+      const assistantMessage: Message = { role: "assistant", content: "" };
+      setMessages(prev => [...prev, assistantMessage]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        
+        let newlineIndex: number;
+        while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+          let line = buffer.slice(0, newlineIndex);
+          buffer = buffer.slice(newlineIndex + 1);
+
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (line.startsWith(":") || line.trim() === "") continue;
+          if (!line.startsWith("data: ")) continue;
+
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === "[DONE]") break;
+
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content;
+            if (content) {
+              accumulatedText += content;
+              setMessages(prev => {
+                const newMessages = [...prev];
+                const lastMsg = newMessages[newMessages.length - 1];
+                if (lastMsg.role === "assistant") {
+                  lastMsg.content = accumulatedText;
+                }
+                return newMessages;
+              });
+            }
+          } catch (e) {
+            buffer = line + "\n" + buffer;
+            break;
+          }
+        }
+      }
+
+      return accumulatedText;
+    } catch (error) {
+      console.error("Error streaming AI response:", error);
+      throw error;
     }
-
-    // Caminho certo
-    if (lowerQuestion.includes("caminho") || lowerQuestion.includes("indo bem")) {
-      if (financialData.tendencia === "positiva") {
-        return `✅ Sim, você está no caminho certo!\n\n• Receita em crescimento: +${financialData.crescimento_receita.toFixed(1)}%\n• Lucro líquido: ${formatCurrency(financialData.lucro_liquido)}\n• Margem: ${financialData.margem.toFixed(1)}%\n\n${financialData.benchmark.status === "acima" ? "🎯 Sua margem está acima da média histórica!" : ""}`;
-      } else {
-        return `⚠️ Há espaço para melhorar:\n\n• Lucro atual: ${formatCurrency(financialData.lucro_liquido)}\n• Margem: ${financialData.margem.toFixed(1)}%\n\n💡 Recomendação: ${financialData.alertas[0]?.action || "Revise custos e preços"}`;
-      }
-    }
-
-    // Resposta genérica
-    return `📊 Aqui está um resumo:\n\n• Receita: ${formatCurrency(financialData.receita)}\n• Lucro: ${formatCurrency(financialData.lucro_liquido)}\n• Margem: ${financialData.margem.toFixed(1)}%\n• Tendência: ${financialData.tendencia === "positiva" ? "📈 Positiva" : financialData.tendencia === "negativa" ? "📉 Negativa" : "➡️ Neutra"}\n\nPergunta algo mais específico para eu te ajudar melhor!`;
   };
 
   const handleSend = async () => {
@@ -135,12 +159,11 @@ export function FinancialChat() {
     setLoading(true);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simula processamento
-      const response = generateResponse(input);
-      const assistantMessage: Message = { role: "assistant", content: response };
-      setMessages(prev => [...prev, assistantMessage]);
+      await streamAIResponse(userMessage.content);
     } catch (error) {
-      toast.error("Erro ao processar sua pergunta");
+      const errorMessage = error instanceof Error ? error.message : "Erro ao processar sua pergunta";
+      toast.error(errorMessage);
+      setMessages(prev => prev.slice(0, -1));
     } finally {
       setLoading(false);
     }

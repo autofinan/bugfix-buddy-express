@@ -6,7 +6,10 @@ import { ProfitDistribution } from "./ProfitDistribution";
 import { FinancialAlerts } from "./FinancialAlerts";
 import { FinancialChat } from "./FinancialChat";
 import { CategoryAnalysis } from "./CategoryAnalysis";
-import { Brain, TrendingUp, PieChart, Bell, MessageSquare } from "lucide-react";
+import { BreakEvenAnalysis } from "./BreakEvenAnalysis";
+import { SeasonalityAnalysis } from "./SeasonalityAnalysis";
+import { MEIChecklist } from "./MEIChecklist";
+import { Brain, TrendingUp, PieChart, Bell, MessageSquare, Calendar, ClipboardCheck } from "lucide-react";
 
 export default function FinancialAssistantView() {
   return (
@@ -22,7 +25,7 @@ export default function FinancialAssistantView() {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6 w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1 h-auto p-1">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1 h-auto p-1">
           <TabsTrigger value="overview" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 py-2">
             <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
             <span className="truncate">Visão Geral</span>
@@ -35,9 +38,17 @@ export default function FinancialAssistantView() {
             <Brain className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
             <span className="truncate">Análises</span>
           </TabsTrigger>
-          <TabsTrigger value="distribution" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 py-2">
-            <PieChart className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-            <span className="truncate">Distribuição</span>
+          <TabsTrigger value="breakeven" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 py-2">
+            <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+            <span className="truncate">P. Equilíbrio</span>
+          </TabsTrigger>
+          <TabsTrigger value="seasonality" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 py-2">
+            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+            <span className="truncate">Sazonalidade</span>
+          </TabsTrigger>
+          <TabsTrigger value="checklist" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 py-2">
+            <ClipboardCheck className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+            <span className="truncate">Checklist MEI</span>
           </TabsTrigger>
           <TabsTrigger value="alerts" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 py-2">
             <Bell className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
@@ -58,8 +69,30 @@ export default function FinancialAssistantView() {
           <CategoryAnalysis />
         </TabsContent>
 
-        <TabsContent value="distribution" className="space-y-4 sm:space-y-6 mt-0">
-          <ProfitDistribution />
+        <TabsContent value="breakeven" className="space-y-4 sm:space-y-6 mt-0">
+          <BreakEvenAnalysis
+            fixedCosts={5000}
+            variableCostPerUnit={30}
+            pricePerUnit={50}
+            currentSales={300}
+          />
+        </TabsContent>
+
+        <TabsContent value="seasonality" className="space-y-4 sm:space-y-6 mt-0">
+          <SeasonalityAnalysis
+            monthlyData={[
+              { month: "Jan", revenue: 15000, expenses: 8000 },
+              { month: "Fev", revenue: 18000, expenses: 8500 },
+              { month: "Mar", revenue: 22000, expenses: 9000 },
+              { month: "Abr", revenue: 19000, expenses: 8700 },
+              { month: "Mai", revenue: 25000, expenses: 10000 },
+              { month: "Jun", revenue: 28000, expenses: 11000 },
+            ]}
+          />
+        </TabsContent>
+
+        <TabsContent value="checklist" className="space-y-4 sm:space-y-6 mt-0">
+          <MEIChecklist />
         </TabsContent>
 
         <TabsContent value="alerts" className="space-y-4 sm:space-y-6 mt-0">
