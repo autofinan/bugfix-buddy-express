@@ -42,7 +42,23 @@ export function GeneralSettings() {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      // Configurações serão implementadas futuramente
+      
+      const { data, error } = await supabase.rpc('get_store_settings');
+
+      if (error) throw error;
+
+      if (data) {
+        setSettings({
+          store_name: data.store_name || "",
+          cnpj: data.cnpj || "",
+          phone: data.phone || "",
+          address: data.address || "",
+          logo_url: data.logo_url || null,
+          primary_color: data.primary_color || "#3b82f6",
+          accent_color: data.accent_color || "#10b981",
+          max_discount_percentage: data.max_discount_percentage || 10
+        });
+      }
     } catch (error) {
       console.error("Erro ao carregar configurações:", error);
       toast({
@@ -59,7 +75,6 @@ export function GeneralSettings() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validar tipo de arquivo
     if (!file.type.startsWith('image/')) {
       toast({
         title: "Erro",
@@ -69,7 +84,6 @@ export function GeneralSettings() {
       return;
     }
 
-    // Validar tamanho (máximo 2MB)
     if (file.size > 2 * 1024 * 1024) {
       toast({
         title: "Erro",
@@ -84,17 +98,16 @@ export function GeneralSettings() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("Usuário não autenticado");
 
-      // Criar nome único para o arquivo
       const fileExt = file.name.split('.').pop();
       const fileName = `${userData.user.id}/logo-${Date.now()}.${fileExt}`;
 
       // Deletar logo anterior se existir
       if (settings.logo_url) {
-        const oldPath = settings.logo_url.split('/').pop();
+        const oldPath = settings.logo_url.split('/').slice(-2).join('/');
         if (oldPath) {
           await supabase.storage
             .from('product-images')
-            .remove([`${userData.user.id}/${oldPath}`]);
+            .remove([oldPath]);
         }
       }
 
@@ -117,7 +130,7 @@ export function GeneralSettings() {
       
       toast({
         title: "Sucesso",
-        description: "Logo carregada com sucesso!"
+        description: "Logo carregada com sucesso! Clique em 'Salvar Configurações' para confirmar."
       });
     } catch (error) {
       console.error("Erro ao fazer upload:", error);
@@ -134,19 +147,29 @@ export function GeneralSettings() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error("Usuário não autenticado");
-
-      // Salvamento de configurações será implementado futuramente
-      toast({
-        title: "Em desenvolvimento",
-        description: "Esta funcionalidade será implementada em breve"
+      
+      const { data, error } = await supabase.rpc('upsert_store_settings', {
+        p_store_name: settings.store_name || '',
+        p_cnpj: settings.cnpj || '',
+        p_phone: settings.phone || '',
+        p_address: settings.address || '',
+        p_logo_url: settings.logo_url || '',
+        p_primary_color: settings.primary_color || '#3b82f6',
+        p_accent_color: settings.accent_color || '#10b981',
+        p_max_discount_percentage: settings.max_discount_percentage || 10
       });
-    } catch (error) {
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Configurações salvas com sucesso!",
+      });
+    } catch (error: any) {
       console.error("Erro ao salvar:", error);
       toast({
         title: "Erro",
-        description: "Erro ao salvar configurações",
+        description: error.message || "Erro ao salvar configurações",
         variant: "destructive"
       });
     } finally {
@@ -207,7 +230,7 @@ export function GeneralSettings() {
         {/* Informações da Loja */}
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="store_name">Nome da Loja</Label>
+            <Label htmlFor="store_name">Nome da Loja *</Label>
             <Input
               id="store_name"
               value={settings.store_name}
@@ -240,14 +263,15 @@ export function GeneralSettings() {
             <Label htmlFor="max_discount">Limite de Desconto (%)</Label>
             <Input
               id="max_discount"
-              type="text"
-              inputMode="decimal"
-              value={settings.max_discount_percentage || ""}
+              type="number"
+              min="0"
+              max="100"
+              step="0.1"
+              value={settings.max_discount_percentage}
               onChange={(e) => {
-                const value = e.target.value.replace(/[^0-9.]/g, '');
-                const numValue = value === "" ? 0 : parseFloat(value);
-                if (numValue <= 100) {
-                  setSettings(prev => ({ ...prev, max_discount_percentage: numValue }));
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value) && value >= 0 && value <= 100) {
+                  setSettings(prev => ({ ...prev, max_discount_percentage: value }));
                 }
               }}
               placeholder="10"
@@ -321,13 +345,13 @@ export function GeneralSettings() {
             <p className="text-sm font-medium">Preview:</p>
             <div className="flex gap-2">
               <div 
-                className="w-20 h-20 rounded-lg shadow-md flex items-center justify-center text-white font-bold"
+                className="w-20 h-20 rounded-lg shadow-md flex items-center justify-center text-white font-bold text-xs"
                 style={{ backgroundColor: settings.primary_color }}
               >
                 Principal
               </div>
               <div 
-                className="w-20 h-20 rounded-lg shadow-md flex items-center justify-center text-white font-bold"
+                className="w-20 h-20 rounded-lg shadow-md flex items-center justify-center text-white font-bold text-xs"
                 style={{ backgroundColor: settings.accent_color }}
               >
                 Secundária
@@ -337,18 +361,19 @@ export function GeneralSettings() {
         </div>
 
         <div className="flex justify-end pt-4 border-t">
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={handleSave} disabled={saving || !settings.store_name}>
             <Save className="h-4 w-4 mr-2" />
             {saving ? "Salvando..." : "Salvar Configurações"}
           </Button>
         </div>
 
         <div className="bg-muted/50 p-4 rounded-lg space-y-2">
-          <h4 className="font-medium text-sm">Informações importantes:</h4>
+          <h4 className="font-medium text-sm">ℹ️ Informações importantes:</h4>
           <ul className="text-sm text-muted-foreground space-y-1">
             <li>• As informações da loja serão exibidas nos PDFs de orçamento</li>
             <li>• As cores serão aplicadas nos documentos gerados</li>
             <li>• O limite de desconto será validado no PDV</li>
+            <li>• Nome da loja é obrigatório</li>
           </ul>
         </div>
       </CardContent>
