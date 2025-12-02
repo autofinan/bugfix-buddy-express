@@ -1,0 +1,684 @@
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CreditCard, Banknote, Smartphone, AlertTriangle, CalendarIcon, Download } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { CartItem } from "./POSView";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import { generateSaleReceipt } from "@/utils/receiptUtils";
+import { useAuth } from "@/hooks/useAuth";
+
+interface PaymentModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  total: number;
+  cartItems: CartItem[];
+  onComplete: () => void;
+}
+
+interface UserDiscountLimit {
+  max_discount_percentage: number;
+}
+
+interface PaymentSplit {
+  method: PaymentMethod;
+  amount: number;
+  installments?: number;
+}
+
+type PaymentMethod = "dinheiro" | "debito" | "credito_vista" | "credito_parcelado" | "pix" | "transferencia";
+
+export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete }: PaymentModalProps) {
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pix");
+  const [installments, setInstallments] = useState(1);
+  const [note, setNote] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [discountType, setDiscountType] = useState<"percentage" | "fixed">("percentage");
+  const [discountValue, setDiscountValue] = useState(0);
+  const [userDiscountLimit, setUserDiscountLimit] = useState<UserDiscountLimit | null>(null);
+  const [discountError, setDiscountError] = useState("");
+  const [paymentFees, setPaymentFees] = useState<Record<string, number>>({});
+  const [saleDate, setSaleDate] = useState<Date>(new Date());
+  const [splitPayment, setSplitPayment] = useState(false);
+  const [payment1, setPayment1] = useState<PaymentSplit>({ method: "dinheiro", amount: 0 });
+  const [payment2, setPayment2] = useState<PaymentSplit>({ method: "pix", amount: 0 });
+  const [storeSettings, setStoreSettings] = useState<any>(null);
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  const paymentMethods = [
+    { id: "dinheiro" as PaymentMethod, label: "Dinheiro", icon: Banknote },
+    { id: "pix" as PaymentMethod, label: "PIX", icon: Smartphone },
+    { id: "debito" as PaymentMethod, label: "Débito", icon: CreditCard },
+    { id: "credito_vista" as PaymentMethod, label: "Crédito à vista", icon: CreditCard },
+    { id: "credito_parcelado" as PaymentMethod, label: "Crédito Parcelado", icon: CreditCard },
+    { id: "transferencia" as PaymentMethod, label: "Transferência", icon: Banknote },
+  ];
+
+  useEffect(() => {
+    if (open) {
+      fetchUserDiscountLimit();
+      fetchPaymentFees();
+      fetchStoreSettings();
+      // Resetar pagamento dividido quando abrir
+      setSplitPayment(false);
+      setPayment1({ method: "dinheiro", amount: 0 });
+      setPayment2({ method: "pix", amount: 0 });
+    }
+  }, [open]);
+
+  // Atualizar payment2.amount automaticamente quando payment1.amount mudar
+  useEffect(() => {
+    if (splitPayment && payment1.amount > 0) {
+      const finalTotal = calculateFinalTotal();
+      setPayment2(prev => ({ 
+        ...prev, 
+        amount: Math.max(0, finalTotal - payment1.amount) 
+      }));
+    }
+  }, [payment1.amount, splitPayment]);
+
+  const fetchUserDiscountLimit = async () => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+
+      // Buscar de user_discount_limits
+      const { data, error } = await supabase
+        .from("user_discount_limits")
+        .select("max_discount_percentage")
+        .eq("user_id", userData.user.id)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error("Erro ao buscar limite de desconto:", error);
+        return;
+      }
+
+      setUserDiscountLimit(data || { max_discount_percentage: 10 });
+    } catch (error) {
+      console.error("Erro ao buscar limite de desconto:", error);
+    }
+  };
+
+  const fetchPaymentFees = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("payment_fees")
+        .select("*");
+
+      if (error) throw error;
+
+      const feesMap: Record<string, number> = {};
+      data?.forEach((fee: any) => {
+        if (fee.method === "credito_parcelado") {
+          feesMap[`${fee.method}_${fee.installments}`] = Number(fee.fee_percentage);
+        } else {
+          feesMap[fee.method] = Number(fee.fee_percentage);
+        }
+      });
+      setPaymentFees(feesMap);
+    } catch (error) {
+      console.error("Erro ao buscar taxas:", error);
+    }
+  };
+
+  const fetchStoreSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("store_settings")
+        .select("*")
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error("Erro ao buscar configurações:", error);
+      }
+      
+      setStoreSettings(data);
+    } catch (error) {
+      console.error("Erro ao buscar configurações:", error);
+    }
+  };
+
+  const validateDiscount = () => {
+    setDiscountError("");
+    
+    if (discountValue <= 0) return true;
+
+    if (discountType === "percentage") {
+      if (!userDiscountLimit) return true;
+      
+      if (discountValue > userDiscountLimit.max_discount_percentage) {
+        setDiscountError(`Desconto máximo permitido: ${userDiscountLimit.max_discount_percentage}%`);
+        return false;
+      }
+    } else {
+      if (discountValue >= total) {
+        setDiscountError("Desconto não pode ser maior ou igual ao total");
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const calculateDiscount = () => {
+    if (discountValue <= 0) return 0;
+    
+    if (discountType === "percentage") {
+      return (total * discountValue) / 100;
+    }
+    return discountValue;
+  };
+
+  const calculateFinalTotal = () => {
+    return Math.max(0, total - calculateDiscount());
+  };
+
+  const getPaymentFee = () => {
+    if (paymentMethod === "credito_parcelado") {
+      return paymentFees[`${paymentMethod}_${installments}`] || 0;
+    }
+    return paymentFees[paymentMethod] || 0;
+  };
+
+  const calculateGrossAmount = () => {
+    return calculateFinalTotal();
+  };
+
+  const calculateNetAmount = () => {
+    const gross = calculateGrossAmount();
+    const feePercentage = getPaymentFee();
+    return gross - (gross * feePercentage / 100);
+  };
+
+  const handleConfirmSale = async () => {
+    if (!validateDiscount()) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const subtotal = total;
+      const discount = calculateDiscount();
+      const finalTotal = calculateFinalTotal();
+
+      const grossAmount = calculateGrossAmount();
+      const netAmount = calculateNetAmount();
+
+      // Validar pagamento dividido
+      if (splitPayment) {
+        const sum = Number(payment1.amount) + Number(payment2.amount);
+        const diff = Math.abs(sum - finalTotal);
+        
+        if (diff > 0.01) { // Tolerância de 1 centavo para erros de arredondamento
+          toast({
+            title: "Erro",
+            description: `A soma dos pagamentos (R$ ${sum.toFixed(2)}) deve ser igual ao total da venda (R$ ${finalTotal.toFixed(2)})`,
+            variant: "destructive",
+            duration: 5000,
+          });
+          setLoading(false);
+          return;
+        }
+        if (payment1.amount <= 0 || payment2.amount <= 0) {
+          toast({
+            title: "Erro",
+            description: "Ambos os pagamentos devem ter valor maior que zero",
+            variant: "destructive",
+            duration: 4000,
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Obter dados do vendedor (usuário logado)
+      const sellerId = user?.id || null;
+      const sellerName = user?.email?.split('@')[0] || 'Sistema';
+
+      // Registrar a venda
+      const { data: sale, error: saleError } = await supabase
+        .from("sales")
+        .insert({
+          subtotal,
+          discount_type: discountValue > 0 ? discountType : null,
+          discount_value: discountValue,
+          total: finalTotal,
+          gross_amount: grossAmount,
+          net_amount: netAmount,
+          payment_method: splitPayment ? "dividido" : paymentMethod,
+          installments: paymentMethod === "credito_parcelado" ? installments : 1,
+          note: splitPayment 
+            ? `${note ? note + " | " : ""}Pagamento dividido: R$${payment1.amount.toFixed(2)} (${payment1.method}) + R$${payment2.amount.toFixed(2)} (${payment2.method}) | Vendedor: ${sellerName}`
+            : `${note || ""}${note ? " | " : ""}Vendedor: ${sellerName}`,
+          date: saleDate.toISOString(),
+        })
+        .select()
+        .single();
+
+      if (saleError) throw saleError;
+
+      // Registrar pagamentos divididos na tabela sale_payments
+      if (splitPayment) {
+        const paymentsToInsert = [
+          {
+            sale_id: sale.id,
+            payment_method: payment1.method,
+            amount: payment1.amount,
+            installments: payment1.method === "credito_parcelado" ? (payment1.installments || 1) : 1
+          },
+          {
+            sale_id: sale.id,
+            payment_method: payment2.method,
+            amount: payment2.amount,
+            installments: payment2.method === "credito_parcelado" ? (payment2.installments || 1) : 1
+          }
+        ];
+
+        // Registrar os pagamentos divididos
+        const { error: paymentsError } = await supabase
+          .from("sale_payments" as any)
+          .insert(paymentsToInsert);
+
+        if (paymentsError) {
+          console.error("Erro ao registrar pagamentos:", paymentsError);
+          throw paymentsError;
+        }
+      }
+
+      // Registrar os itens da venda
+      for (const item of cartItems) {
+        if (item.type === "produto") {
+          // Para produtos: buscar custo e atualizar estoque
+          const { data: productData, error: fetchError } = await supabase
+            .from("products")
+            .select("stock, cost")
+            .eq("id", item.id)
+            .single();
+
+          if (fetchError) throw fetchError;
+
+          // Inserir o item da venda com o custo
+          const { error: itemError } = await supabase
+            .from("sale_items")
+            .insert({
+              sale_id: sale.id,
+              product_id: item.id,
+              service_id: null,
+              item_type: "produto",
+              quantity: item.quantity,
+              unit_price: item.price,
+              total_price: item.price * item.quantity,
+              custo_unitario: productData.cost || 0
+            });
+
+          if (itemError) throw itemError;
+
+          // Atualizar estoque
+          const { error: updateError } = await supabase
+            .from("products")
+            .update({
+              stock: Math.max(0, (productData.stock || 0) - item.quantity)
+            })
+            .eq("id", item.id);
+
+          if (updateError) throw updateError;
+        } else {
+          // Para serviços: apenas registrar a venda (sem controle de estoque)
+          const { error: itemError } = await supabase
+            .from("sale_items")
+            .insert({
+              sale_id: sale.id,
+              product_id: null,
+              service_id: item.id,
+              item_type: "servico",
+              quantity: item.quantity,
+              unit_price: item.price,
+              total_price: item.price * item.quantity,
+              custo_unitario: 0
+            });
+
+          if (itemError) throw itemError;
+        }
+      }
+
+
+      toast({
+        title: "Venda finalizada",
+        description: `Venda de R$ ${finalTotal.toFixed(2)} registrada com sucesso!`,
+        duration: 3000,
+      });
+
+      onComplete();
+      setNote("");
+      setPaymentMethod("pix");
+      setInstallments(1);
+      setDiscountValue(0);
+      setDiscountType("percentage");
+      setDiscountError("");
+    } catch (error) {
+      console.error("Erro ao finalizar venda:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao processar a venda. Tente novamente.",
+        variant: "destructive",
+        duration: 4000,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadPDF = () => {
+    if (storeSettings) {
+      generateSaleReceipt(cartItems, calculateFinalTotal(), paymentMethod, {
+        name: storeSettings.store_name || 'Minha Loja',
+        cnpj: storeSettings.cnpj || '',
+        phone: storeSettings.phone || '',
+        address: storeSettings.address || ''
+      });
+    } else {
+      generateSaleReceipt(cartItems, calculateFinalTotal(), paymentMethod);
+    }
+    
+    toast({
+      title: "PDF gerado",
+      description: "Comprovante baixado com sucesso!",
+      duration: 2000,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Finalizar Venda</DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          <div className="text-center space-y-1 pb-2 border-b">
+            <h3 className="text-xl font-bold">R$ {total.toFixed(2)}</h3>
+            {discountValue > 0 && (
+              <div className="text-red-600 text-sm">
+                <p>Desconto: -R$ {calculateDiscount().toFixed(2)}</p>
+                <p className="font-semibold">Total: R$ {calculateFinalTotal().toFixed(2)}</p>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">{cartItems.length} itens</p>
+          </div>
+
+          {/* Data da Venda */}
+          <div className="space-y-2">
+            <Label>Data da Venda</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !saleDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {saleDate ? format(saleDate, "PPP", { locale: ptBR }) : <span>Selecionar data</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={saleDate}
+                  onSelect={(date) => date && setSaleDate(date)}
+                  disabled={(date) => date > new Date()}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Desconto */}
+          <div className="space-y-2">
+            <Label>Desconto</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-2">
+                <Select value={discountType} onValueChange={(value: "percentage" | "fixed") => setDiscountType(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentage">Porcentagem (%)</SelectItem>
+                    <SelectItem value="fixed">Valor Fixo (R$)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={discountValue || ""}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9.]/g, '');
+                    const numValue = value === "" ? 0 : Number(value);
+                    setDiscountValue(numValue);
+                    setDiscountError("");
+                  }}
+                  placeholder={discountType === "percentage" ? "%" : "R$"}
+                />
+              </div>
+            </div>
+            
+            {discountError && (
+              <div className="flex items-center gap-2 text-red-600 text-sm">
+                <AlertTriangle className="h-4 w-4" />
+                <span>{discountError}</span>
+              </div>
+            )}
+            
+            {userDiscountLimit && (
+              <p className="text-xs text-muted-foreground">
+                Limite máximo: {userDiscountLimit.max_discount_percentage}%
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Forma de Pagamento</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {paymentMethods.map((method) => (
+                <Card
+                  key={method.id}
+                  className={`p-3 cursor-pointer transition-colors ${
+                    paymentMethod === method.id
+                      ? "border-primary bg-primary/5"
+                      : "hover:bg-muted/50"
+                  }`}
+                  onClick={() => {
+                    setPaymentMethod(method.id);
+                    if (method.id !== "credito_parcelado") {
+                      setInstallments(1);
+                    }
+                  }}
+                >
+                  <div className="text-center space-y-1">
+                    <method.icon className="h-6 w-6 mx-auto" />
+                    <p className="text-sm font-medium">{method.label}</p>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          {paymentMethod === "credito_parcelado" && (
+            <div className="space-y-2">
+              <Label>Número de Parcelas</Label>
+              <Select value={installments.toString()} onValueChange={(v) => setInstallments(parseInt(v))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[2, 3, 4, 5, 6].map((num) => (
+                    <SelectItem key={num} value={num.toString()}>
+                      {num}x de R$ {(calculateFinalTotal() / num).toFixed(2)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="note">Observações</Label>
+            <Textarea
+              id="note"
+              placeholder="Observações..."
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+            />
+          </div>
+
+          {/* Dividir Pagamento */}
+          <div className="space-y-3 pt-3 border-t">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Dividir Pagamento</Label>
+              <Button
+                type="button"
+                variant={splitPayment ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setSplitPayment(!splitPayment);
+                  if (!splitPayment) {
+                    // Inicializar valores
+                    const finalTotal = calculateFinalTotal();
+                    setPayment1({ method: "dinheiro", amount: finalTotal / 2 });
+                    setPayment2({ method: "pix", amount: finalTotal / 2 });
+                  }
+                }}
+              >
+                {splitPayment ? "Desativar" : "Ativar"}
+              </Button>
+            </div>
+
+            {splitPayment && (
+              <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
+                {/* Primeiro Pagamento */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Primeiro Pagamento</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select 
+                      value={payment1.method} 
+                      onValueChange={(value: PaymentMethod) => setPayment1(prev => ({ ...prev, method: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {paymentMethods.map((method) => (
+                          <SelectItem key={method.id} value={method.id}>
+                            {method.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      value={payment1.amount || ""}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9.]/g, '');
+                        const numValue = value === "" ? 0 : parseFloat(value);
+                        setPayment1(prev => ({ ...prev, amount: numValue }));
+                      }}
+                      placeholder="R$ 0,00"
+                    />
+                  </div>
+                </div>
+
+                {/* Segundo Pagamento */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Segundo Pagamento</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select 
+                      value={payment2.method} 
+                      onValueChange={(value: PaymentMethod) => setPayment2(prev => ({ ...prev, method: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {paymentMethods.map((method) => (
+                          <SelectItem key={method.id} value={method.id}>
+                            {method.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="text"
+                      value={payment2.amount ? payment2.amount.toFixed(2) : ""}
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+                </div>
+
+                {/* Validação */}
+                {payment1.amount + payment2.amount !== calculateFinalTotal() && (
+                  <p className="text-xs text-destructive">
+                    Atenção: Total deve ser R$ {calculateFinalTotal().toFixed(2)}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {!splitPayment && getPaymentFee() > 0 && (
+            <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
+              <p>Valor pago: R$ {calculateGrossAmount().toFixed(2)}</p>
+              <p>Taxa: {getPaymentFee().toFixed(2)}%</p>
+              <p className="font-semibold text-green-600">Valor líquido: R$ {calculateNetAmount().toFixed(2)}</p>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="flex-1"
+              disabled={loading}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleDownloadPDF}
+              disabled={cartItems.length === 0}
+              size="sm"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+            <Button
+              onClick={handleConfirmSale}
+              className="flex-1"
+              disabled={loading || !!discountError}
+            >
+              {loading ? "Processando..." : "Confirmar Venda"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
