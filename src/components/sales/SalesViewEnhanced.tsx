@@ -269,8 +269,10 @@ export function SalesViewEnhanced() {
   const handleShareWhatsApp = (saleId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const url = `https://gestormei.vercel.app/nf/${saleId}`;
-    const message = `Olá! Segue sua Nota Fiscal da venda #${saleId.substring(0, 8).toUpperCase()}%0A%0AVisualizar: ${url}`;
-    window.open(`https://wa.me/?text=${message}`, '_blank');
+    const saleIdShort = saleId.substring(0, 8).toUpperCase();
+    const message = `Olá! Segue sua Nota Fiscal da venda #${saleIdShort}\n\nVisualizar: ${url}`;
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
   };
 
   const totalSales = filteredSales.reduce((sum, sale) => sum + Number(sale.total), 0);

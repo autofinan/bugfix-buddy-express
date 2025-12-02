@@ -208,28 +208,43 @@ export function SaleDetailsModal({
     if (!sale || !items) return;
 
     try {
-      const receiptData = {
-        id: sale.id,
-        date: sale.date,
-        items: items.map(item => ({
-          name: item.products?.name || item.services?.name || "Item",
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          total_price: item.total_price
-        })),
-        subtotal: sale.subtotal || sale.total,
-        discount_type: sale.discount_type,
-        discount_value: sale.discount_value,
-        total: sale.total,
-        payment_method: sale.payment_method,
-        installments: sale.installments,
-        store_name: storeSettings?.store_name || "Minha Loja",
-        store_cnpj: storeSettings?.cnpj || "",
-        store_address: storeSettings?.address || "",
-        store_phone: storeSettings?.phone || ""
-      };
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) {
+        toast({
+          title: "Erro",
+          description: "Você precisa estar autenticado.",
+          variant: "destructive"
+        });
+        return;
+      }
 
-      generateSaleReceipt(receiptData);
+      const storeSettings = await supabase
+        .from('store_settings')
+        .select('*')
+        .eq('owner_id', session.session.user.id)
+        .single();
+
+      const storeInfo = storeSettings.data ? {
+        name: storeSettings.data.store_name || '',
+        cnpj: storeSettings.data.cnpj || '',
+        phone: storeSettings.data.phone || '',
+        address: storeSettings.data.address || ''
+      } : undefined;
+
+      const saleItems = items.map((item, index) => ({
+        id: `${sale.id}-${index}`,
+        name: item.products?.name || item.services?.name || "Item",
+        price: item.unit_price,
+        quantity: item.quantity,
+        type: 'produto' as 'produto' | 'servico'
+      }));
+
+      await generateSaleReceipt(
+        saleItems,
+        sale.total,
+        sale.payment_method,
+        storeInfo
+      );
 
       toast({
         title: "Cupom Fiscal gerado",

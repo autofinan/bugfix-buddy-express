@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Product } from "./ProductsView";
-import { Upload, X, Image as ImageIcon } from "lucide-react";
+import { Upload, X, Image as ImageIcon, ScanBarcode } from "lucide-react";
+import { BarcodeScanner } from "@/components/scanner/BarcodeScanner";
 
 interface Category {
   id: string;
@@ -30,6 +31,7 @@ export function ProductForm({ open, onOpenChange, product, onSave, onClose }: Pr
   const [uploading, setUploading] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
+  const [showScanner, setShowScanner] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -344,11 +346,22 @@ export function ProductForm({ open, onOpenChange, product, onSave, onClose }: Pr
 
             <div className="space-y-2">
               <Label htmlFor="barcode">Código de Barras</Label>
-              <Input
-                id="barcode"
-                value={formData.barcode}
-                onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="barcode"
+                  value={formData.barcode}
+                  onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowScanner(true)}
+                  title="Escanear código de barras"
+                >
+                  <ScanBarcode className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -427,6 +440,20 @@ export function ProductForm({ open, onOpenChange, product, onSave, onClose }: Pr
           </div>
         </form>
       </DialogContent>
+
+      {/* Scanner Modal */}
+      <BarcodeScanner
+        isOpen={showScanner}
+        onClose={() => setShowScanner(false)}
+        onScan={(code) => {
+          setFormData({ ...formData, barcode: code });
+          setShowScanner(false);
+          toast({
+            title: "Código escaneado",
+            description: `Código de barras: ${code}`
+          });
+        }}
+      />
     </Dialog>
   );
 }

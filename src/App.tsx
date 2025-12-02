@@ -41,6 +41,7 @@ import CategoriesPage from "./components/categories/CategoriesView";
 import StockAdjustmentPage from "./components/inventory/StockAdjustmentView";
 import StockPage from "./pages/Stock";
 import EmployeeManagement from "./pages/EmployeeManagement";
+import { MobilePOSView } from "./components/pos/MobilePOSView";
 
 // Sidebar Provider
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -101,6 +102,7 @@ function App() {
                         <Routes>
                           <Route path="/" element={<Index />} />
                           <Route path="/pos" element={<POSPage />} />
+                          <Route path="/pos/mobile" element={<MobilePOSView />} />
                           <Route path="/products" element={<ProductsPage />} />
                           <Route path="/bulk-products" element={<BulkProductsPage />} />
                           <Route path="/import-csv" element={<ImportCSVPage />} />
