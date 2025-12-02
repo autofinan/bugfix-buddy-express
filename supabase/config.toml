@@ -1,0 +1,19 @@
+project_id = "rllpfnmhelrnombjyiuz"
+
+[functions.analyze-distribution]
+verify_jwt = true
+
+[functions.create-employee]
+verify_jwt = true
+
+[functions.financial-chat]
+verify_jwt = true
+
+[functions.generate-nf-pdf]
+verify_jwt = false
+
+[functions.stripe-webhooks]
+verify_jwt = false
+
+[functions.create-checkout-session]
+verify_jwt = true
