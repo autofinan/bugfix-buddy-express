@@ -1231,6 +1231,7 @@ export type Database = {
         }[]
       }
       get_my_owner_id: { Args: never; Returns: string }
+      get_public_sale: { Args: { sale_id_param: string }; Returns: Json }
       get_sales_with_profit: {
         Args: never
         Returns: {
