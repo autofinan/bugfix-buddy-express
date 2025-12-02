@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { Trash2, ScanBarcode, ShoppingCart } from 'lucide-react';
+import { Trash2, ScanBarcode, ShoppingCart, Plus, Minus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { BarcodeScanner } from '@/components/scanner/BarcodeScanner';
@@ -13,6 +12,7 @@ interface Product {
   name: string;
   price: number;
   barcode?: string;
+  stock?: number;
 }
 
 interface CartItem extends Product {
@@ -35,18 +35,36 @@ export function MobilePOSView() {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, price, barcode')
+        .select('id, name, price, barcode, stock')
         .eq('is_active', true);
 
       if (error) throw error;
       setProducts(data || []);
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar os produtos.",
-        variant: "destructive"
-      });
+    }
+  };
+
+  const playBeep = () => {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.value = 1000;
+      oscillator.type = 'sine';
+      gainNode.gain.value = 0.3;
+      
+      oscillator.start();
+      setTimeout(() => {
+        oscillator.stop();
+        audioContext.close();
+      }, 150);
+    } catch (e) {
+      console.log('Audio not supported');
     }
   };
 
@@ -55,15 +73,18 @@ export function MobilePOSView() {
     
     if (product) {
       addToCart(product);
+      playBeep();
       toast({
-        title: "Produto adicionado",
-        description: `${product.name} adicionado ao carrinho.`
+        title: "✓ Produto adicionado",
+        description: product.name,
+        duration: 1500,
       });
     } else {
       toast({
         title: "Produto não encontrado",
-        description: `Código de barras ${code} não cadastrado.`,
-        variant: "destructive"
+        description: `Código: ${code}`,
+        variant: "destructive",
+        duration: 2000,
       });
     }
   };
@@ -90,7 +111,8 @@ export function MobilePOSView() {
     setCart(prev => prev.map(item => {
       if (item.id === productId) {
         const newQuantity = item.quantity + change;
-        return newQuantity > 0 ? { ...item, quantity: newQuantity } : item;
+        if (newQuantity <= 0) return item;
+        return { ...item, quantity: newQuantity };
       }
       return item;
     }).filter(item => item.quantity > 0));
@@ -111,100 +133,99 @@ export function MobilePOSView() {
     setCart([]);
     setShowPayment(false);
     toast({
-      title: "Venda concluída",
-      description: "Venda registrada com sucesso!"
+      title: "Venda concluída!",
+      description: "Venda registrada com sucesso.",
     });
   };
 
   const total = getTotal();
+  const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      {/* Header */}
-      <div className="bg-primary text-primary-foreground p-4 shadow-lg">
+    <div className="fixed inset-0 flex flex-col bg-background">
+      {/* Header Compacto */}
+      <div className="bg-primary text-primary-foreground px-4 py-3 flex-shrink-0 safe-area-top">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold">PDV Mobile</h1>
-            <p className="text-sm opacity-90">GestorMEI</p>
+            <h1 className="text-lg font-bold">PDV Mobile</h1>
+            <p className="text-xs opacity-80">{itemCount} {itemCount === 1 ? 'item' : 'itens'}</p>
           </div>
           <div className="text-right">
-            <p className="text-xs opacity-90">Total</p>
-            <p className="text-2xl font-bold">{formatCurrency(total)}</p>
+            <p className="text-xs opacity-80">Total</p>
+            <p className="text-xl font-bold">{formatCurrency(total)}</p>
           </div>
         </div>
       </div>
 
-      {/* Scan Button - Destaque */}
-      <div className="p-4">
+      {/* Botão Principal de Scanner */}
+      <div className="p-4 flex-shrink-0">
         <Button
           onClick={() => setShowScanner(true)}
           size="lg"
-          className="w-full h-24 text-xl font-bold"
+          className="w-full h-28 text-xl font-bold flex flex-col items-center justify-center gap-3 bg-primary hover:bg-primary/90 shadow-xl rounded-xl"
         >
-          <ScanBarcode className="h-8 w-8 mr-3" />
-          BIPAR PRODUTO
+          <ScanBarcode className="h-12 w-12" />
+          <span>ESCANEAR PRODUTO</span>
         </Button>
       </div>
 
-      {/* Cart Items */}
+      {/* Lista de Itens do Carrinho */}
       <div className="flex-1 overflow-y-auto px-4 pb-4">
         {cart.length === 0 ? (
-          <Card className="p-8 text-center">
-            <ShoppingCart className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <p className="text-muted-foreground">
+          <Card className="p-8 text-center bg-muted/30 border-dashed">
+            <ShoppingCart className="h-16 w-16 mx-auto mb-4 text-muted-foreground/40" />
+            <p className="text-lg font-medium text-muted-foreground">
               Carrinho vazio
             </p>
             <p className="text-sm text-muted-foreground mt-2">
-              Escaneie produtos para começar
+              Toque em "Escanear Produto" para começar
             </p>
           </Card>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {cart.map((item) => (
-              <Card key={item.id} className="p-4">
-                <div className="flex items-start justify-between gap-3">
+              <Card key={item.id} className="p-3">
+                <div className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold truncate">{item.name}</h3>
-                    <p className="text-sm text-muted-foreground">
+                    <h3 className="font-medium text-sm truncate">{item.name}</h3>
+                    <p className="text-xs text-muted-foreground">
                       {formatCurrency(item.price)} × {item.quantity}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold">
-                      {formatCurrency(item.price * item.quantity)}
-                    </p>
-                  </div>
-                </div>
-
-                <Separator className="my-3" />
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  
+                  <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
                     <Button
-                      variant="outline"
-                      size="sm"
+                      variant="ghost"
+                      size="icon"
                       onClick={() => updateQuantity(item.id, -1)}
-                      className="h-8 w-8 p-0"
+                      className="h-8 w-8"
                     >
-                      -
+                      <Minus className="h-4 w-4" />
                     </Button>
-                    <span className="font-semibold w-8 text-center">
+                    <span className="font-bold w-8 text-center text-sm">
                       {item.quantity}
                     </span>
                     <Button
-                      variant="outline"
-                      size="sm"
+                      variant="ghost"
+                      size="icon"
                       onClick={() => updateQuantity(item.id, 1)}
-                      className="h-8 w-8 p-0"
+                      className="h-8 w-8"
                     >
-                      +
+                      <Plus className="h-4 w-4" />
                     </Button>
                   </div>
+
+                  <div className="text-right min-w-[70px]">
+                    <p className="font-bold text-sm text-primary">
+                      {formatCurrency(item.price * item.quantity)}
+                    </p>
+                  </div>
+                  
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon"
                     onClick={() => removeFromCart(item.id)}
-                    className="text-destructive"
+                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -215,15 +236,20 @@ export function MobilePOSView() {
         )}
       </div>
 
-      {/* Footer - Finalizar */}
+      {/* Footer Fixo - Finalizar Venda */}
       {cart.length > 0 && (
-        <div className="p-4 bg-card border-t shadow-lg">
+        <div className="p-4 bg-card border-t shadow-lg flex-shrink-0 safe-area-bottom">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-muted-foreground">{itemCount} itens</span>
+            <span className="text-2xl font-bold text-primary">{formatCurrency(total)}</span>
+          </div>
           <Button
             onClick={() => setShowPayment(true)}
             size="lg"
-            className="w-full h-16 text-lg font-bold"
+            className="w-full h-14 text-lg font-bold"
           >
-            Finalizar Venda - {formatCurrency(total)}
+            <ShoppingCart className="mr-2 h-5 w-5" />
+            Finalizar Venda
           </Button>
         </div>
       )}
