@@ -9,7 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import { CartDrawer } from "./CartDrawer";
 import { Package, Wrench, Maximize, Zap } from "lucide-react";
 import FastSaleView from "./FastSaleView";
-
+import { MobilePOSView } from "./MobilePOSView";
+import { useIsMobile } from "@/hooks/use-mobile";
 export interface CartItem {
   id: string;
   name: string;
@@ -26,6 +27,12 @@ export default function POSView() {
   const [kioskMode, setKioskMode] = useState(false);
   const [fastMode, setFastMode] = useState(false);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
+
+  // Se for mobile, renderizar MobilePOSView diretamente
+  if (isMobile) {
+    return <MobilePOSView />;
+  }
 
   // Atalho Ctrl+P para abrir pagamento
   useEffect(() => {
