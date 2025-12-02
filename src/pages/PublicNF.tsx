@@ -94,7 +94,7 @@ export default function PublicNF() {
           address: nfData.store?.address,
           phone: nfData.store?.phone
         },
-        plan: 'free'
+        plan: 'free' as const
       };
 
       const pdfBlob = await generateNFPDF(pdfData);
