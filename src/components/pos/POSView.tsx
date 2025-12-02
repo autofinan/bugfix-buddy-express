@@ -29,11 +29,6 @@ export default function POSView() {
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
-  // Se for mobile, renderizar MobilePOSView diretamente
-  if (isMobile) {
-    return <MobilePOSView />;
-  }
-
   // Atalho Ctrl+P para abrir pagamento
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -164,8 +159,25 @@ export default function POSView() {
     });
   };
 
-  // Se estiver no modo rápido, renderizar FastSaleView
+  // Se estiver no modo rápido, renderizar versão apropriada
   if (fastMode) {
+    // Mobile usa MobilePOSView, Desktop usa FastSaleView
+    if (isMobile) {
+      return (
+        <div className="min-h-screen">
+          <div className="p-4">
+            <Button
+              variant="outline"
+              onClick={() => setFastMode(false)}
+              className="mb-4"
+            >
+              Voltar ao PDV Normal
+            </Button>
+          </div>
+          <MobilePOSView />
+        </div>
+      );
+    }
     return (
       <div>
         <div className="flex justify-end mb-4">
@@ -182,44 +194,50 @@ export default function POSView() {
   }
 
   return (
-    <div className={`space-y-6 min-h-screen ${kioskMode ? 'p-4' : ''}`}>
-      {/* Header com título e botão de limpar carrinho */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Ponto de Venda</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {!kioskMode && "Pressione Ctrl+P para finalizar venda"}
-          </p>
-        </div>
-        <div className="flex gap-2 items-center">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setFastMode(true)}
-          >
-            <Zap className="h-4 w-4 mr-2" />
-            PDV Rápido
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={kioskMode ? exitKioskMode : enterKioskMode}
-          >
-            <Maximize className="h-4 w-4 mr-2" />
-            {kioskMode ? "Sair do Quiosque" : "Modo Quiosque"}
-          </Button>
-          <CartDrawer
-            items={cart}
-            total={total}
-            onUpdateQuantity={updateQuantity}
-            onRemoveItem={removeFromCart}
-            onCheckout={() => {
-              setCartDrawerOpen(false);
-              setShowPayment(true);
-            }}
-            open={cartDrawerOpen}
-            onOpenChange={setCartDrawerOpen}
-          />
+    <div className={`space-y-4 md:space-y-6 min-h-screen ${kioskMode ? 'p-4' : ''}`}>
+      {/* Header responsivo */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl md:text-3xl font-bold truncate">Ponto de Venda</h1>
+            <p className="text-xs md:text-sm text-muted-foreground mt-1 hidden sm:block">
+              {!kioskMode && "Pressione Ctrl+P para finalizar venda"}
+            </p>
+          </div>
+          
+          <div className="flex flex-wrap gap-2 items-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setFastMode(true)}
+              className="flex-1 sm:flex-none"
+            >
+              <Zap className="h-4 w-4 mr-1 md:mr-2" />
+              <span className="hidden xs:inline">PDV </span>Rápido
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={kioskMode ? exitKioskMode : enterKioskMode}
+              className="flex-1 sm:flex-none"
+            >
+              <Maximize className="h-4 w-4 mr-1 md:mr-2" />
+              <span className="hidden md:inline">{kioskMode ? "Sair do Quiosque" : "Modo Quiosque"}</span>
+              <span className="md:hidden">{kioskMode ? "Sair" : "Quiosque"}</span>
+            </Button>
+            <CartDrawer
+              items={cart}
+              total={total}
+              onUpdateQuantity={updateQuantity}
+              onRemoveItem={removeFromCart}
+              onCheckout={() => {
+                setCartDrawerOpen(false);
+                setShowPayment(true);
+              }}
+              open={cartDrawerOpen}
+              onOpenChange={setCartDrawerOpen}
+            />
+          </div>
         </div>
       </div>
 
