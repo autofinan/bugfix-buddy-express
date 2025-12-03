@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CreditCard, Banknote, Smartphone, AlertTriangle, CalendarIcon, Download } from "lucide-react";
+import { CreditCard, Banknote, Smartphone, AlertTriangle, CalendarIcon, Download, Coins } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CartItem } from "./POSView";
 import { useToast } from "@/hooks/use-toast";
@@ -53,6 +53,8 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
   const [payment1, setPayment1] = useState<PaymentSplit>({ method: "dinheiro", amount: 0 });
   const [payment2, setPayment2] = useState<PaymentSplit>({ method: "pix", amount: 0 });
   const [storeSettings, setStoreSettings] = useState<any>(null);
+  // Campos para troco em dinheiro
+  const [cashReceived, setCashReceived] = useState<number>(0);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -74,26 +76,24 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
       setSplitPayment(false);
       setPayment1({ method: "dinheiro", amount: 0 });
       setPayment2({ method: "pix", amount: 0 });
+      setCashReceived(0);
     }
   }, [open]);
 
   // Atualizar payment2.amount automaticamente quando payment1.amount mudar
   useEffect(() => {
-    if (splitPayment && payment1.amount > 0) {
+    if (splitPayment) {
       const finalTotal = calculateFinalTotal();
-      setPayment2(prev => ({ 
-        ...prev, 
-        amount: Math.max(0, finalTotal - payment1.amount) 
-      }));
+      const remaining = Math.max(0, finalTotal - payment1.amount);
+      setPayment2(prev => ({ ...prev, amount: remaining }));
     }
-  }, [payment1.amount, splitPayment]);
+  }, [payment1.amount, splitPayment, discountValue, discountType]);
 
   const fetchUserDiscountLimit = async () => {
     try {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
 
-      // Buscar de user_discount_limits
       const { data, error } = await supabase
         .from("user_discount_limits")
         .select("max_discount_percentage")
@@ -202,8 +202,26 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
     return gross - (gross * feePercentage / 100);
   };
 
+  const calculateChange = () => {
+    const finalTotal = calculateFinalTotal();
+    return Math.max(0, cashReceived - finalTotal);
+  };
+
   const handleConfirmSale = async () => {
     if (!validateDiscount()) {
+      return;
+    }
+
+    const finalTotal = calculateFinalTotal();
+
+    // Validar troco em dinheiro
+    if (paymentMethod === "dinheiro" && !splitPayment && cashReceived < finalTotal) {
+      toast({
+        title: "Valor insuficiente",
+        description: "O valor recebido é menor que o total da venda",
+        variant: "destructive",
+        duration: 3000,
+      });
       return;
     }
 
@@ -212,20 +230,19 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
 
       const subtotal = total;
       const discount = calculateDiscount();
-      const finalTotal = calculateFinalTotal();
 
       const grossAmount = calculateGrossAmount();
       const netAmount = calculateNetAmount();
 
-      // Validar pagamento dividido
+      // Validar pagamento dividido com tolerância
       if (splitPayment) {
         const sum = Number(payment1.amount) + Number(payment2.amount);
         const diff = Math.abs(sum - finalTotal);
         
-        if (diff > 0.01) { // Tolerância de 1 centavo para erros de arredondamento
+        if (diff > 0.02) { // Tolerância de 2 centavos
           toast({
             title: "Erro",
-            description: `A soma dos pagamentos (R$ ${sum.toFixed(2)}) deve ser igual ao total da venda (R$ ${finalTotal.toFixed(2)})`,
+            description: `A soma dos pagamentos (R$ ${sum.toFixed(2)}) deve ser igual ao total (R$ ${finalTotal.toFixed(2)})`,
             variant: "destructive",
             duration: 5000,
           });
@@ -244,9 +261,21 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
         }
       }
 
-      // Obter dados do vendedor (usuário logado)
+      // Obter dados do vendedor
       const sellerId = user?.id || null;
       const sellerName = user?.email?.split('@')[0] || 'Sistema';
+
+      // Construir nota com troco se for dinheiro
+      let saleNote = note || "";
+      if (paymentMethod === "dinheiro" && !splitPayment && cashReceived > 0) {
+        const change = calculateChange();
+        saleNote += `${saleNote ? " | " : ""}Recebido: R$${cashReceived.toFixed(2)} / Troco: R$${change.toFixed(2)}`;
+      }
+      saleNote += `${saleNote ? " | " : ""}Vendedor: ${sellerName}`;
+
+      if (splitPayment) {
+        saleNote = `${note ? note + " | " : ""}Pagamento dividido: R$${payment1.amount.toFixed(2)} (${payment1.method}) + R$${payment2.amount.toFixed(2)} (${payment2.method}) | Vendedor: ${sellerName}`;
+      }
 
       // Registrar a venda
       const { data: sale, error: saleError } = await supabase
@@ -260,9 +289,7 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
           net_amount: netAmount,
           payment_method: splitPayment ? "dividido" : paymentMethod,
           installments: paymentMethod === "credito_parcelado" ? installments : 1,
-          note: splitPayment 
-            ? `${note ? note + " | " : ""}Pagamento dividido: R$${payment1.amount.toFixed(2)} (${payment1.method}) + R$${payment2.amount.toFixed(2)} (${payment2.method}) | Vendedor: ${sellerName}`
-            : `${note || ""}${note ? " | " : ""}Vendedor: ${sellerName}`,
+          note: saleNote,
           date: saleDate.toISOString(),
         })
         .select()
@@ -270,7 +297,7 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
 
       if (saleError) throw saleError;
 
-      // Registrar pagamentos divididos na tabela sale_payments
+      // Registrar pagamentos divididos
       if (splitPayment) {
         const paymentsToInsert = [
           {
@@ -287,21 +314,19 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
           }
         ];
 
-        // Registrar os pagamentos divididos
         const { error: paymentsError } = await supabase
-          .from("sale_payments" as any)
+          .from("sale_payments")
           .insert(paymentsToInsert);
 
         if (paymentsError) {
           console.error("Erro ao registrar pagamentos:", paymentsError);
-          throw paymentsError;
+          // Não throw, apenas log - a venda principal foi criada
         }
       }
 
       // Registrar os itens da venda
       for (const item of cartItems) {
         if (item.type === "produto") {
-          // Para produtos: buscar custo e atualizar estoque
           const { data: productData, error: fetchError } = await supabase
             .from("products")
             .select("stock, cost")
@@ -310,7 +335,6 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
 
           if (fetchError) throw fetchError;
 
-          // Inserir o item da venda com o custo
           const { error: itemError } = await supabase
             .from("sale_items")
             .insert({
@@ -326,7 +350,6 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
 
           if (itemError) throw itemError;
 
-          // Atualizar estoque
           const { error: updateError } = await supabase
             .from("products")
             .update({
@@ -336,7 +359,6 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
 
           if (updateError) throw updateError;
         } else {
-          // Para serviços: apenas registrar a venda (sem controle de estoque)
           const { error: itemError } = await supabase
             .from("sale_items")
             .insert({
@@ -354,7 +376,6 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
         }
       }
 
-
       toast({
         title: "Venda finalizada",
         description: `Venda de R$ ${finalTotal.toFixed(2)} registrada com sucesso!`,
@@ -368,6 +389,7 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
       setDiscountValue(0);
       setDiscountType("percentage");
       setDiscountError("");
+      setCashReceived(0);
     } catch (error) {
       console.error("Erro ao finalizar venda:", error);
       toast({
@@ -400,6 +422,8 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
     });
   };
 
+  const finalTotal = calculateFinalTotal();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
@@ -413,7 +437,7 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
             {discountValue > 0 && (
               <div className="text-red-600 text-sm">
                 <p>Desconto: -R$ {calculateDiscount().toFixed(2)}</p>
-                <p className="font-semibold">Total: R$ {calculateFinalTotal().toFixed(2)}</p>
+                <p className="font-semibold">Total: R$ {finalTotal.toFixed(2)}</p>
               </div>
             )}
             <p className="text-xs text-muted-foreground">{cartItems.length} itens</p>
@@ -451,32 +475,28 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
           <div className="space-y-2">
             <Label>Desconto</Label>
             <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-2">
-                <Select value={discountType} onValueChange={(value: "percentage" | "fixed") => setDiscountType(value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="percentage">Porcentagem (%)</SelectItem>
-                    <SelectItem value="fixed">Valor Fixo (R$)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select value={discountType} onValueChange={(value: "percentage" | "fixed") => setDiscountType(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="percentage">Porcentagem (%)</SelectItem>
+                  <SelectItem value="fixed">Valor Fixo (R$)</SelectItem>
+                </SelectContent>
+              </Select>
               
-              <div className="space-y-2">
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={discountValue || ""}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9.]/g, '');
-                    const numValue = value === "" ? 0 : Number(value);
-                    setDiscountValue(numValue);
-                    setDiscountError("");
-                  }}
-                  placeholder={discountType === "percentage" ? "%" : "R$"}
-                />
-              </div>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={discountValue || ""}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9.]/g, '');
+                  const numValue = value === "" ? 0 : Number(value);
+                  setDiscountValue(numValue);
+                  setDiscountError("");
+                }}
+                placeholder={discountType === "percentage" ? "%" : "R$"}
+              />
             </div>
             
             {discountError && (
@@ -509,6 +529,8 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
                     if (method.id !== "credito_parcelado") {
                       setInstallments(1);
                     }
+                    // Reset troco quando mudar método
+                    setCashReceived(0);
                   }}
                 >
                   <div className="text-center space-y-1">
@@ -520,6 +542,44 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
             </div>
           </div>
 
+          {/* Campo de Troco para Dinheiro */}
+          {paymentMethod === "dinheiro" && !splitPayment && (
+            <div className="space-y-3 p-4 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+              <Label className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                <Coins className="h-4 w-4" />
+                Valor Recebido
+              </Label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={cashReceived || ""}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9.]/g, '');
+                  setCashReceived(value === "" ? 0 : parseFloat(value));
+                }}
+                placeholder="R$ 0,00"
+                className="text-lg font-bold text-center"
+              />
+              
+              {cashReceived > 0 && (
+                <div className="text-center pt-2 border-t border-emerald-200">
+                  {cashReceived >= finalTotal ? (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Troco</p>
+                      <p className="text-3xl font-bold text-emerald-600">
+                        R$ {calculateChange().toFixed(2)}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-red-600 font-medium">
+                      Falta: R$ {(finalTotal - cashReceived).toFixed(2)}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {paymentMethod === "credito_parcelado" && (
             <div className="space-y-2">
               <Label>Número de Parcelas</Label>
@@ -530,7 +590,7 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
                 <SelectContent>
                   {[2, 3, 4, 5, 6].map((num) => (
                     <SelectItem key={num} value={num.toString()}>
-                      {num}x de R$ {(calculateFinalTotal() / num).toFixed(2)}
+                      {num}x de R$ {(finalTotal / num).toFixed(2)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -558,12 +618,12 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
                 variant={splitPayment ? "default" : "outline"}
                 size="sm"
                 onClick={() => {
-                  setSplitPayment(!splitPayment);
-                  if (!splitPayment) {
-                    // Inicializar valores
-                    const finalTotal = calculateFinalTotal();
-                    setPayment1({ method: "dinheiro", amount: finalTotal / 2 });
-                    setPayment2({ method: "pix", amount: finalTotal / 2 });
+                  const newSplit = !splitPayment;
+                  setSplitPayment(newSplit);
+                  if (newSplit) {
+                    const half = Math.floor(finalTotal * 100) / 200; // Arredondar para centavos
+                    setPayment1({ method: "dinheiro", amount: half });
+                    setPayment2({ method: "pix", amount: finalTotal - half });
                   }
                 }}
               >
@@ -599,7 +659,9 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
                       onChange={(e) => {
                         const value = e.target.value.replace(/[^0-9.]/g, '');
                         const numValue = value === "" ? 0 : parseFloat(value);
-                        setPayment1(prev => ({ ...prev, amount: numValue }));
+                        // Limitar ao total
+                        const limitedValue = Math.min(numValue, finalTotal);
+                        setPayment1(prev => ({ ...prev, amount: limitedValue }));
                       }}
                       placeholder="R$ 0,00"
                     />
@@ -608,7 +670,7 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
 
                 {/* Segundo Pagamento */}
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Segundo Pagamento</Label>
+                  <Label className="text-xs text-muted-foreground">Segundo Pagamento (automático)</Label>
                   <div className="grid grid-cols-2 gap-2">
                     <Select 
                       value={payment2.method} 
@@ -625,21 +687,26 @@ export function PaymentModal({ open, onOpenChange, total, cartItems, onComplete 
                         ))}
                       </SelectContent>
                     </Select>
-                    <Input
-                      type="text"
-                      value={payment2.amount ? payment2.amount.toFixed(2) : ""}
-                      disabled
-                      className="bg-muted"
-                    />
+                    <div className="flex items-center justify-center bg-muted rounded-md px-3 font-bold">
+                      R$ {payment2.amount.toFixed(2)}
+                    </div>
                   </div>
                 </div>
 
-                {/* Validação */}
-                {payment1.amount + payment2.amount !== calculateFinalTotal() && (
-                  <p className="text-xs text-destructive">
-                    Atenção: Total deve ser R$ {calculateFinalTotal().toFixed(2)}
-                  </p>
-                )}
+                {/* Resumo */}
+                <div className="pt-2 border-t text-sm">
+                  <div className="flex justify-between">
+                    <span>Total dividido:</span>
+                    <span className={cn(
+                      "font-bold",
+                      Math.abs((payment1.amount + payment2.amount) - finalTotal) < 0.02 
+                        ? "text-green-600" 
+                        : "text-red-600"
+                    )}>
+                      R$ {(payment1.amount + payment2.amount).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
           </div>
