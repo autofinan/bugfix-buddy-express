@@ -254,11 +254,12 @@ export function MobilePOSView() {
         </div>
       )}
 
-      {/* Scanner Modal */}
+      {/* Scanner Modal - Mantém aberto após leitura */}
       <BarcodeScanner
         isOpen={showScanner}
         onClose={() => setShowScanner(false)}
         onScan={handleBarcodeScan}
+        keepOpen={true}
       />
 
       {/* Payment Modal */}

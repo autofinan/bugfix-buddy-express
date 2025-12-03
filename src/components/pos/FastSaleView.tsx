@@ -5,8 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { usePlan } from "@/hooks/usePlan";
 import { PaymentModal } from "./PaymentModal";
-import { Minus, Plus, Trash2, ShoppingCart, X, Maximize, Minimize } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingCart, Maximize, Minimize, Clock, User, Search, Package } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,6 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useAuth } from "@/hooks/useAuth";
 
 export interface FastSaleCartItem {
   id: string;
@@ -36,17 +38,29 @@ export default function FastSaleView() {
   const [storeSettings, setStoreSettings] = useState<any>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showPlanDialog, setShowPlanDialog] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [searchMode, setSearchMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-  const { isPro, canUseFeature } = usePlan();
+  const { isPro, loading: planLoading } = usePlan();
+  const { user } = useAuth();
 
-  // Verificar acesso ao PDV Rápido (apenas PRO)
+  // Atualizar relógio
   useEffect(() => {
-    if (!isPro) {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Verificar acesso ao PDV Rápido (apenas PRO) - só após carregar
+  useEffect(() => {
+    if (!planLoading && !isPro) {
       setShowPlanDialog(true);
     }
-  }, [isPro]);
+  }, [isPro, planLoading]);
 
   // Buscar configurações da loja
   useEffect(() => {
@@ -55,21 +69,21 @@ export default function FastSaleView() {
 
   // Entrar em fullscreen automaticamente
   useEffect(() => {
-    if (isPro && containerRef.current && !isFullscreen) {
+    if (!planLoading && isPro && containerRef.current && !isFullscreen) {
       enterFullscreen();
     }
-  }, [isPro]);
+  }, [isPro, planLoading]);
 
   // Manter foco no input sempre
   useEffect(() => {
     const interval = setInterval(() => {
-      if (inputRef.current && document.activeElement !== inputRef.current) {
+      if (!searchMode && inputRef.current && document.activeElement !== inputRef.current && !showPayment) {
         inputRef.current.focus();
       }
     }, 200);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [searchMode, showPayment]);
 
   // Detectar mudanças no fullscreen
   useEffect(() => {
@@ -88,9 +102,7 @@ export default function FastSaleView() {
       if (
         (e.ctrlKey && (e.key === '+' || e.key === '-' || e.key === '0')) ||
         (e.ctrlKey && e.key === 's') ||
-        (e.ctrlKey && e.key === 'p' && !showPayment) ||
         (e.ctrlKey && e.key === 'o') ||
-        e.key === 'F5' ||
         e.key === 'F11'
       ) {
         e.preventDefault();
@@ -101,9 +113,14 @@ export default function FastSaleView() {
         e.preventDefault();
         toast({
           title: "Atalhos do PDV Rápido",
-          description: "F2: Pesquisar | F3: Cancelar item | F4: Finalizar | ESC: Sair fullscreen",
+          description: "F2: Pesquisar | F3: Cancelar item | F4: Finalizar | ESC: Sair",
           duration: 5000,
         });
+      }
+      if (e.key === 'F2') {
+        e.preventDefault();
+        setSearchMode(true);
+        setTimeout(() => searchInputRef.current?.focus(), 100);
       }
       if (e.key === 'F3' && cart.length > 0) {
         e.preventDefault();
@@ -113,8 +130,14 @@ export default function FastSaleView() {
         e.preventDefault();
         setShowPayment(true);
       }
-      if (e.key === 'Escape' && isFullscreen) {
-        exitFullscreen();
+      if (e.key === 'Escape') {
+        if (searchMode) {
+          setSearchMode(false);
+          setSearchQuery("");
+          setSearchResults([]);
+        } else if (isFullscreen) {
+          exitFullscreen();
+        }
       }
     };
 
@@ -137,7 +160,7 @@ export default function FastSaleView() {
       window.removeEventListener('contextmenu', handleContextMenu);
       window.removeEventListener('wheel', handleWheel);
     };
-  }, [cart, showPayment, isFullscreen]);
+  }, [cart, showPayment, isFullscreen, searchMode]);
 
   const enterFullscreen = async () => {
     if (containerRef.current) {
@@ -237,6 +260,27 @@ export default function FastSaleView() {
     }
   };
 
+  const handleSearch = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("is_active", true)
+        .ilike("name", `%${query}%`)
+        .limit(10);
+
+      if (error) throw error;
+      setSearchResults(data || []);
+    } catch (error) {
+      console.error("Erro na busca:", error);
+    }
+  };
+
   const addToCart = (product: any) => {
     setCart(current => {
       const existing = current.find(item => item.id === product.id);
@@ -276,6 +320,11 @@ export default function FastSaleView() {
       setCurrentProduct(newItem);
       return [...current, newItem];
     });
+
+    // Fechar busca após adicionar
+    setSearchMode(false);
+    setSearchQuery("");
+    setSearchResults([]);
   };
 
   const updateQuantity = (id: string, quantity: number) => {
@@ -306,6 +355,7 @@ export default function FastSaleView() {
   const removeFromCart = (id: string) => {
     setCart(current => current.filter(item => item.id !== id));
     setCurrentProduct(null);
+    playBeep();
   };
 
   const clearCart = () => {
@@ -336,6 +386,20 @@ export default function FastSaleView() {
 
   const primaryColor = storeSettings?.primary_color || "#10b981";
   const storeName = storeSettings?.store_name || "GestorMEI";
+  const operatorName = user?.email?.split('@')[0] || 'Operador';
+
+  // Loading do plano
+  if (planLoading) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <Skeleton className="h-12 w-48 mx-auto" />
+          <Skeleton className="h-4 w-32 mx-auto" />
+          <p className="text-muted-foreground">Carregando PDV...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Bloqueio para plano não-PRO
   if (!isPro) {
@@ -391,7 +455,7 @@ export default function FastSaleView() {
         autoFocus
       />
 
-      {/* TOPO - 80px */}
+      {/* TOPO - Header Profissional */}
       <div 
         className="h-20 px-6 flex items-center justify-between border-b-2"
         style={{ backgroundColor: primaryColor, borderColor: primaryColor }}
@@ -400,18 +464,37 @@ export default function FastSaleView() {
           <ShoppingCart className="h-8 w-8 text-white" />
           <div>
             <h1 className="text-2xl font-bold text-white">
-              {storeName} - PDV Rápido
+              {storeName}
             </h1>
             <p className="text-xs text-white/90">
-              Modo Quiosque Ativado
+              PDV Rápido - Frente de Caixa
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-6 text-white/90 text-sm">
-          <span>F1: Ajuda</span>
-          <span>F3: Remover</span>
-          <span>F4: Finalizar</span>
+        <div className="flex items-center gap-6">
+          {/* Informações do Operador */}
+          <div className="flex items-center gap-2 text-white/90">
+            <User className="h-4 w-4" />
+            <span className="text-sm">{operatorName}</span>
+          </div>
+
+          {/* Relógio */}
+          <div className="flex items-center gap-2 text-white">
+            <Clock className="h-4 w-4" />
+            <span className="text-lg font-mono">
+              {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+
+          {/* Atalhos */}
+          <div className="hidden lg:flex items-center gap-3 text-white/80 text-xs">
+            <span className="px-2 py-1 bg-white/10 rounded">F1: Ajuda</span>
+            <span className="px-2 py-1 bg-white/10 rounded">F2: Buscar</span>
+            <span className="px-2 py-1 bg-white/10 rounded">F3: Remover</span>
+            <span className="px-2 py-1 bg-white/10 rounded">F4: Finalizar</span>
+          </div>
+
           <Button
             variant="ghost"
             size="icon"
@@ -423,17 +506,98 @@ export default function FastSaleView() {
         </div>
       </div>
 
-      {/* Produto Atual */}
-      {currentProduct && (
-        <div className="px-6 py-3 bg-white border-b">
+      {/* Barra de Busca (F2) */}
+      {searchMode && (
+        <div className="px-6 py-3 bg-white border-b shadow-sm">
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">Último escaneado:</span>
-            <span className="text-2xl font-bold" style={{ color: primaryColor }}>
-              {currentProduct.name}
-            </span>
-            <span className="text-lg text-muted-foreground">
-              {currentProduct.barcode || lastScanned}
-            </span>
+            <Search className="h-5 w-5 text-muted-foreground" />
+            <Input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Digite o nome do produto para buscar..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                handleSearch(e.target.value);
+              }}
+              className="flex-1 text-lg"
+              autoFocus
+            />
+            <Button variant="outline" onClick={() => {
+              setSearchMode(false);
+              setSearchQuery("");
+              setSearchResults([]);
+            }}>
+              Cancelar (ESC)
+            </Button>
+          </div>
+          {searchResults.length > 0 && (
+            <div className="mt-2 border rounded-lg max-h-60 overflow-y-auto">
+              {searchResults.map(product => (
+                <div 
+                  key={product.id}
+                  className="p-3 hover:bg-muted cursor-pointer flex items-center justify-between border-b last:border-b-0"
+                  onClick={() => {
+                    addToCart(product);
+                    playBeep();
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <Package className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">{product.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {product.barcode || 'Sem código'} • Estoque: {product.stock || 0}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="font-bold text-lg" style={{ color: primaryColor }}>
+                    {formatCurrency(product.price)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Produto Atual - Destaque */}
+      {currentProduct && (
+        <div className="px-6 py-4 bg-white border-b shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              {/* Imagem do Produto */}
+              {currentProduct.image_url ? (
+                <img 
+                  src={currentProduct.image_url} 
+                  alt={currentProduct.name}
+                  className="w-20 h-20 object-cover rounded-lg border"
+                />
+              ) : (
+                <div className="w-20 h-20 bg-muted rounded-lg flex items-center justify-center">
+                  <Package className="h-10 w-10 text-muted-foreground" />
+                </div>
+              )}
+
+              <div>
+                <p className="text-sm text-muted-foreground">Último produto:</p>
+                <h2 className="text-3xl font-bold" style={{ color: primaryColor }}>
+                  {currentProduct.name}
+                </h2>
+                <div className="flex items-center gap-6 mt-1 text-sm text-muted-foreground">
+                  <span>Código: {currentProduct.barcode || lastScanned || '-'}</span>
+                  <span>Qtd: {currentProduct.quantity}</span>
+                  <span>Unit: {formatCurrency(currentProduct.price)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-right">
+              <p className="text-sm text-muted-foreground">Total do item</p>
+              <p className="text-4xl font-bold" style={{ color: primaryColor }}>
+                {formatCurrency(currentProduct.price * currentProduct.quantity)}
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -442,8 +606,9 @@ export default function FastSaleView() {
       <div className="flex-1 grid grid-cols-3 gap-0 overflow-hidden">
         {/* ESQUERDA - TABELA (2 colunas) */}
         <div className="col-span-2 bg-white border-r overflow-hidden flex flex-col">
-          <div className="px-6 py-4 border-b bg-muted/30">
-            <h2 className="text-lg font-semibold">Lista da Venda ({itemCount} itens)</h2>
+          <div className="px-6 py-4 border-b bg-muted/30 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Cupom da Venda</h2>
+            <span className="text-sm text-muted-foreground">{itemCount} itens</span>
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -451,10 +616,10 @@ export default function FastSaleView() {
               <div className="flex flex-col items-center justify-center h-full text-center p-8">
                 <ShoppingCart className="h-24 w-24 text-muted-foreground/30 mb-4" />
                 <p className="text-2xl font-medium text-muted-foreground">
-                  Escaneie um produto para começar
+                  Venda Aberta
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Aponte o leitor de código de barras ou digite o código
+                  Escaneie um produto ou pressione F2 para buscar
                 </p>
               </div>
             ) : (
@@ -463,8 +628,8 @@ export default function FastSaleView() {
                   <tr className="border-b">
                     <th className="px-4 py-3 text-left text-sm font-semibold">Código</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Descrição</th>
-                    <th className="px-4 py-3 text-right text-sm font-semibold">Quantidade</th>
-                    <th className="px-4 py-3 text-right text-sm font-semibold">Preço Unitário</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold">Quant.</th>
+                    <th className="px-4 py-3 text-right text-sm font-semibold">Valor Unit.</th>
                     <th className="px-4 py-3 text-right text-sm font-semibold">Preço Total</th>
                     <th className="px-4 py-3 w-12"></th>
                   </tr>
@@ -475,7 +640,7 @@ export default function FastSaleView() {
                       key={item.id}
                       className={`border-b transition-colors ${
                         index === cart.length - 1 
-                          ? 'bg-emerald-50 animate-pulse' 
+                          ? 'bg-emerald-50' 
                           : index % 2 === 0 
                             ? 'bg-muted/20' 
                             : 'bg-white'
@@ -487,8 +652,8 @@ export default function FastSaleView() {
                       <td className="px-4 py-4 text-base font-medium">
                         {item.name}
                       </td>
-                      <td className="px-4 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="px-4 py-4">
+                        <div className="flex items-center justify-center gap-2">
                           <Button
                             variant="outline"
                             size="icon"
@@ -534,94 +699,54 @@ export default function FastSaleView() {
           </div>
         </div>
 
-        {/* DIREITA - PAINEL (1 coluna) */}
-        <div className="bg-gradient-to-b from-white to-muted/30 p-6 flex flex-col gap-6 overflow-y-auto">
-          {/* Imagem do Produto Atual */}
-          {currentProduct && (
-            <Card>
-              <CardContent className="p-4">
-                {currentProduct.image_url ? (
-                  <img 
-                    src={currentProduct.image_url} 
-                    alt={currentProduct.name}
-                    className="w-full aspect-square object-cover rounded-lg mb-3"
-                  />
-                ) : (
-                  <div className="w-full aspect-square bg-muted rounded-lg flex items-center justify-center mb-3">
-                    <ShoppingCart className="h-16 w-16 text-muted-foreground/50" />
-                  </div>
-                )}
-                
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Código do Produto</p>
-                    <p className="font-mono text-sm">{currentProduct.barcode || lastScanned}</p>
-                  </div>
-                  
-                  <div className="flex justify-between pt-2 border-t">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Quantidade</p>
-                      <p className="text-2xl font-bold">{currentProduct.quantity}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-muted-foreground">Preço Unit.</p>
-                      <p className="text-lg font-semibold">{formatCurrency(currentProduct.price)}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="pt-2 border-t">
-                    <p className="text-xs text-muted-foreground">Preço Total do Item</p>
-                    <p className="text-2xl font-bold" style={{ color: primaryColor }}>
-                      {formatCurrency(currentProduct.price * currentProduct.quantity)}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+        {/* DIREITA - PAINEL TOTAL */}
+        <div className="bg-gradient-to-b from-white to-muted/30 flex flex-col">
+          {/* Status da Venda */}
+          <div className="px-6 py-4 border-b text-center">
+            <span 
+              className={`inline-flex px-4 py-2 rounded-full text-sm font-medium ${
+                cart.length > 0 
+                  ? 'bg-emerald-100 text-emerald-700' 
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {cart.length > 0 ? 'Venda em Andamento' : 'Venda Aberta'}
+            </span>
+          </div>
 
-          {/* Resumo da Venda */}
-          <Card style={{ borderColor: primaryColor, borderWidth: 2 }}>
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Resumo da Venda</h3>
-              
-              <div className="space-y-3">
-                <div className="flex justify-between text-lg">
-                  <span className="text-muted-foreground">Total de Itens</span>
-                  <span className="font-bold">{itemCount}</span>
-                </div>
-                
-                <div className="pt-3 border-t-2">
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-xl font-semibold">VALOR TOTAL</span>
-                    <span className="text-4xl font-bold" style={{ color: primaryColor }}>
-                      {formatCurrency(total)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Total Destacado */}
+          <div className="flex-1 flex flex-col items-center justify-center px-6">
+            <p className="text-sm text-muted-foreground uppercase tracking-wider mb-2">
+              Total a Pagar
+            </p>
+            <p 
+              className="text-6xl font-bold tracking-tight"
+              style={{ color: primaryColor }}
+            >
+              {formatCurrency(total)}
+            </p>
+            <p className="text-sm text-muted-foreground mt-4">
+              {itemCount} {itemCount === 1 ? 'item' : 'itens'} no carrinho
+            </p>
+          </div>
 
-          {/* Botões */}
-          <div className="space-y-3 mt-auto">
+          {/* Ações */}
+          <div className="p-6 space-y-3">
             <Button
               onClick={() => setShowPayment(true)}
               disabled={cart.length === 0}
               className="w-full h-16 text-xl font-bold"
-              style={{ backgroundColor: primaryColor }}
+              style={{ backgroundColor: cart.length > 0 ? primaryColor : undefined }}
             >
-              <ShoppingCart className="mr-3 h-6 w-6" />
-              Concluir Venda
+              Finalizar Venda (F4)
             </Button>
-
+            
             {cart.length > 0 && (
               <Button
                 variant="outline"
                 onClick={clearCart}
-                className="w-full h-12 text-base"
+                className="w-full h-12 text-destructive border-destructive hover:bg-destructive/10"
               >
-                <X className="mr-2 h-5 w-5" />
                 Cancelar Venda
               </Button>
             )}
@@ -629,7 +754,20 @@ export default function FastSaleView() {
         </div>
       </div>
 
-      {/* Modal de Pagamento */}
+      {/* Rodapé */}
+      <div 
+        className="h-10 px-6 flex items-center justify-between text-sm"
+        style={{ backgroundColor: primaryColor }}
+      >
+        <span className="text-white/90">
+          {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+        </span>
+        <span className="text-white font-medium">
+          {storeName} - Operador: {operatorName}
+        </span>
+      </div>
+
+      {/* Modal de pagamento */}
       <PaymentModal
         open={showPayment}
         onOpenChange={setShowPayment}

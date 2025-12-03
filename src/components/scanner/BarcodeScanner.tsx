@@ -8,9 +8,10 @@ interface BarcodeScannerProps {
   isOpen: boolean;
   onClose: () => void;
   onScan: (code: string) => void;
+  keepOpen?: boolean; // Manter scanner aberto após leitura
 }
 
-export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps) {
+export function BarcodeScanner({ isOpen, onClose, onScan, keepOpen = false }: BarcodeScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [cameras, setCameras] = useState<any[]>([]);

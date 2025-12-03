@@ -528,6 +528,36 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_history: {
+        Row: {
+          changed_at: string | null
+          id: string
+          metadata: Json | null
+          new_plan: string
+          old_plan: string | null
+          source: string
+          user_id: string
+        }
+        Insert: {
+          changed_at?: string | null
+          id?: string
+          metadata?: Json | null
+          new_plan: string
+          old_plan?: string | null
+          source: string
+          user_id: string
+        }
+        Update: {
+          changed_at?: string | null
+          id?: string
+          metadata?: Json | null
+          new_plan?: string
+          old_plan?: string | null
+          source?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       planejamento_financeiro: {
         Row: {
           atualizado_em: string | null
@@ -1038,6 +1068,36 @@ export type Database = {
           primary_color?: string | null
           store_name?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      system_logs: {
+        Row: {
+          category: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          log_type: string
+          message: string
+          user_id: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          log_type: string
+          message: string
+          user_id?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          log_type?: string
+          message?: string
+          user_id?: string | null
         }
         Relationships: []
       }
