@@ -1,250 +1,202 @@
-import { useState, useEffect } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ProductGrid } from "./ProductGrid";
-import { ServiceGrid } from "./ServiceGrid";
-import { PaymentModal } from "./PaymentModal";
-import { useToast } from "@/hooks/use-toast";
-import { CartDrawer } from "./CartDrawer";
-import { Package, Wrench, Maximize, Zap } from "lucide-react";
-import FastSaleView from "./FastSaleView";
-import { MobilePOSView } from "./MobilePOSView";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Trash2, Search, ShoppingCart, Plus, Minus, Package, Wrench } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { PaymentModal } from './PaymentModal';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { MobilePOSView } from './MobilePOSView';
+
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  barcode?: string;
+  stock?: number;
+  cost?: number;
+}
+
+interface Service {
+  id: string;
+  name: string;
+  price: number;
+  description?: string;
+}
+
 export interface CartItem {
   id: string;
   name: string;
   price: number;
   quantity: number;
+  type: 'produto' | 'servico';
+  cost?: number;
   stock?: number;
-  type: "produto" | "servico";
 }
 
 export default function POSView() {
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [showPayment, setShowPayment] = useState(false);
-  const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
-  const [kioskMode, setKioskMode] = useState(false);
-  const [fastMode, setFastMode] = useState(false);
-  const { toast } = useToast();
   const isMobile = useIsMobile();
-
-  // Atalho Ctrl+P para abrir pagamento
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 'p') {
-        e.preventDefault();
-        if (cart.length > 0) {
-          setCartDrawerOpen(false);
-          setShowPayment(true);
-        }
-      }
-      // ESC para sair do modo quiosque
-      if (e.key === 'Escape' && kioskMode) {
-        exitKioskMode();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [cart, kioskMode]);
-
-  const enterKioskMode = () => {
-    document.documentElement.requestFullscreen?.();
-    setKioskMode(true);
-    toast({
-      title: "Modo Quiosque Ativado",
-      description: "Pressione ESC para sair",
-      duration: 2000,
-    });
-  };
-
-  const exitKioskMode = () => {
-    document.exitFullscreen?.();
-    setKioskMode(false);
-    toast({
-      title: "Modo Quiosque Desativado",
-      duration: 2000,
-    });
-  };
-
-  const addProductToCart = (product: { id: string; name: string; price: number; stock: number }) => {
-    setCart(current => {
-      const existing = current.find(item => item.id === product.id && item.type === "produto");
-      if (existing) {
-        if (existing.quantity >= product.stock) {
-          toast({
-            title: "Estoque insuficiente",
-            description: `Apenas ${product.stock} unidades disponíveis`,
-            variant: "destructive",
-            duration: 3000,
-          });
-          return current;
-        }
-        return current.map(item =>
-          item.id === product.id && item.type === "produto"
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      // Abrir drawer automaticamente ao adicionar primeiro item
-      if (current.length === 0) {
-        setCartDrawerOpen(true);
-      }
-      return [...current, { ...product, quantity: 1, type: "produto" as const }];
-    });
-  };
-
-  const addServiceToCart = (service: { id: string; name: string; price: number }) => {
-    setCart(current => {
-      const existing = current.find(item => item.id === service.id && item.type === "servico");
-      if (existing) {
-        return current.map(item =>
-          item.id === service.id && item.type === "servico"
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      // Abrir drawer automaticamente ao adicionar primeiro item
-      if (current.length === 0) {
-        setCartDrawerOpen(true);
-      }
-      return [...current, { ...service, quantity: 1, type: "servico" as const }];
-    });
-  };
-
-  const updateQuantity = (id: string, quantity: number) => {
-    if (quantity <= 0) {
-      setCart(current => current.filter(item => item.id !== id));
-      return;
-    }
-
-    setCart(current =>
-      current.map(item => {
-        if (item.id === id) {
-          // Apenas produtos têm controle de estoque
-          if (item.type === "produto" && item.stock && quantity > item.stock) {
-            toast({
-              title: "Estoque insuficiente",
-              description: `Apenas ${item.stock} unidades disponíveis`,
-              variant: "destructive",
-              duration: 3000,
-            });
-            return item;
-          }
-          return { ...item, quantity };
-        }
-        return item;
-      })
-    );
-  };
-
-  const removeFromCart = (id: string) => {
-    setCart(current => current.filter(item => item.id !== id));
-  };
-
-  const clearCart = () => {
-    setCart([]);
-  };
-
-  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
-  const handleSaleComplete = () => {
-    setShowPayment(false);
-    clearCart();
-    toast({
-      title: "Venda finalizada",
-      description: "Venda registrada com sucesso!",
-      duration: 3000,
-    });
-  };
-
-  // Se estiver no modo rápido, renderizar versão apropriada
-  if (fastMode) {
-    // Mobile usa MobilePOSView, Desktop usa FastSaleView
-    if (isMobile) {
-      return (
-        <div className="min-h-screen">
-          <div className="p-4">
-            <Button
-              variant="outline"
-              onClick={() => setFastMode(false)}
-              className="mb-4"
-            >
-              Voltar ao PDV Normal
-            </Button>
-          </div>
-          <MobilePOSView />
-        </div>
-      );
-    }
-    return (
-      <div>
-        <div className="flex justify-end mb-4">
-          <Button
-            variant="outline"
-            onClick={() => setFastMode(false)}
-          >
-            Voltar ao PDV Normal
-          </Button>
-        </div>
-        <FastSaleView />
-      </div>
-    );
+  
+  // Se for mobile, renderiza a versão mobile
+  if (isMobile) {
+    return <MobilePOSView />;
   }
 
+  return <DesktopPOSView />;
+}
+
+function DesktopPOSView() {
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showPayment, setShowPayment] = useState(false);
+  const [activeTab, setActiveTab] = useState('produtos');
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchProducts();
+    fetchServices();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, price, barcode, stock, cost')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setProducts(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar produtos:', error);
+    }
+  };
+
+  const fetchServices = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('services')
+        .select('id, name, price, description')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setServices(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar serviços:', error);
+    }
+  };
+
+  const addProductToCart = (product: Product) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.id === product.id && item.type === 'produto');
+      if (existing) {
+        return prev.map(item =>
+          item.id === product.id && item.type === 'produto'
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      return [...prev, { 
+        id: product.id, 
+        name: product.name, 
+        price: product.price, 
+        quantity: 1, 
+        type: 'produto',
+        cost: product.cost 
+      }];
+    });
+  };
+
+  const addServiceToCart = (service: Service) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.id === service.id && item.type === 'servico');
+      if (existing) {
+        return prev.map(item =>
+          item.id === service.id && item.type === 'servico'
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      return [...prev, { 
+        id: service.id, 
+        name: service.name, 
+        price: service.price, 
+        quantity: 1, 
+        type: 'servico' 
+      }];
+    });
+  };
+
+  const removeFromCart = (itemId: string, type: string) => {
+    setCart(prev => prev.filter(item => !(item.id === itemId && item.type === type)));
+  };
+
+  const updateQuantity = (itemId: string, type: string, change: number) => {
+    setCart(prev => prev.map(item => {
+      if (item.id === itemId && item.type === type) {
+        const newQuantity = item.quantity + change;
+        if (newQuantity <= 0) return item;
+        return { ...item, quantity: newQuantity };
+      }
+      return item;
+    }).filter(item => item.quantity > 0));
+  };
+
+  const getTotal = () => {
+    return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(value);
+  };
+
+  const handleSaleComplete = () => {
+    setCart([]);
+    setShowPayment(false);
+    toast({
+      title: "Venda concluída!",
+      description: "Venda registrada com sucesso.",
+    });
+  };
+
+  const filteredProducts = products.filter(p => 
+    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.barcode?.includes(searchTerm)
+  );
+
+  const filteredServices = services.filter(s => 
+    s.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const total = getTotal();
+  const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
   return (
-    <div className={`space-y-4 md:space-y-6 min-h-screen ${kioskMode ? 'p-4' : ''}`}>
-      {/* Header responsivo */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="text-2xl md:text-3xl font-bold truncate">Ponto de Venda</h1>
-            <p className="text-xs md:text-sm text-muted-foreground mt-1 hidden sm:block">
-              {!kioskMode && "Pressione Ctrl+P para finalizar venda"}
-            </p>
-          </div>
-          
-          <div className="flex flex-wrap gap-2 items-center">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setFastMode(true)}
-              className="flex-1 sm:flex-none"
-            >
-              <Zap className="h-4 w-4 mr-1 md:mr-2" />
-              <span className="hidden xs:inline">PDV </span>Rápido
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={kioskMode ? exitKioskMode : enterKioskMode}
-              className="flex-1 sm:flex-none"
-            >
-              <Maximize className="h-4 w-4 mr-1 md:mr-2" />
-              <span className="hidden md:inline">{kioskMode ? "Sair do Quiosque" : "Modo Quiosque"}</span>
-              <span className="md:hidden">{kioskMode ? "Sair" : "Quiosque"}</span>
-            </Button>
-            <CartDrawer
-              items={cart}
-              total={total}
-              onUpdateQuantity={updateQuantity}
-              onRemoveItem={removeFromCart}
-              onCheckout={() => {
-                setCartDrawerOpen(false);
-                setShowPayment(true);
-              }}
-              open={cartDrawerOpen}
-              onOpenChange={setCartDrawerOpen}
+    <div className="flex h-[calc(100vh-120px)] gap-4">
+      {/* Lado Esquerdo - Produtos e Serviços */}
+      <div className="flex-1 flex flex-col">
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome ou código de barras..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
             />
           </div>
         </div>
-      </div>
 
-      {/* Tabs para Produtos e Serviços */}
-      <Card className="p-6">
-        <Tabs defaultValue="produtos" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="produtos" className="flex items-center gap-2">
               <Package className="h-4 w-4" />
               Produtos
@@ -254,18 +206,156 @@ export default function POSView() {
               Serviços
             </TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="produtos">
-            <ProductGrid onAddToCart={addProductToCart} />
+
+          <TabsContent value="produtos" className="flex-1 overflow-y-auto mt-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {filteredProducts.map((product) => (
+                <Card
+                  key={product.id}
+                  className="p-3 cursor-pointer hover:bg-accent transition-colors"
+                  onClick={() => addProductToCart(product)}
+                >
+                  <h3 className="font-medium text-sm truncate">{product.name}</h3>
+                  <p className="text-primary font-bold mt-1">{formatCurrency(product.price)}</p>
+                  {product.stock !== undefined && product.stock !== null && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Estoque: {product.stock}
+                    </p>
+                  )}
+                </Card>
+              ))}
+              {filteredProducts.length === 0 && (
+                <div className="col-span-full text-center py-8 text-muted-foreground">
+                  Nenhum produto encontrado
+                </div>
+              )}
+            </div>
           </TabsContent>
-          
-          <TabsContent value="servicos">
-            <ServiceGrid onAddToCart={addServiceToCart} />
+
+          <TabsContent value="servicos" className="flex-1 overflow-y-auto mt-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {filteredServices.map((service) => (
+                <Card
+                  key={service.id}
+                  className="p-3 cursor-pointer hover:bg-accent transition-colors"
+                  onClick={() => addServiceToCart(service)}
+                >
+                  <h3 className="font-medium text-sm truncate">{service.name}</h3>
+                  <p className="text-primary font-bold mt-1">{formatCurrency(service.price)}</p>
+                  {service.description && (
+                    <p className="text-xs text-muted-foreground mt-1 truncate">
+                      {service.description}
+                    </p>
+                  )}
+                </Card>
+              ))}
+              {filteredServices.length === 0 && (
+                <div className="col-span-full text-center py-8 text-muted-foreground">
+                  Nenhum serviço encontrado
+                </div>
+              )}
+            </div>
           </TabsContent>
         </Tabs>
+      </div>
+
+      {/* Lado Direito - Carrinho */}
+      <Card className="w-96 flex flex-col">
+        <div className="p-4 border-b">
+          <h2 className="font-bold text-lg flex items-center gap-2">
+            <ShoppingCart className="h-5 w-5" />
+            Carrinho
+            {itemCount > 0 && (
+              <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
+                {itemCount}
+              </span>
+            )}
+          </h2>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          {cart.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <ShoppingCart className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p>Carrinho vazio</p>
+              <p className="text-sm mt-1">Clique nos itens para adicionar</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {cart.map((item) => (
+                <div key={`${item.type}-${item.id}`} className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1">
+                      {item.type === 'produto' ? (
+                        <Package className="h-3 w-3 text-muted-foreground" />
+                      ) : (
+                        <Wrench className="h-3 w-3 text-muted-foreground" />
+                      )}
+                      <h4 className="font-medium text-sm truncate">{item.name}</h4>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {formatCurrency(item.price)} × {item.quantity}
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => updateQuantity(item.id, item.type, -1)}
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                    <span className="font-bold w-6 text-center text-sm">{item.quantity}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => updateQuantity(item.id, item.type, 1)}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+
+                  <div className="text-right min-w-[60px]">
+                    <p className="font-bold text-sm text-primary">
+                      {formatCurrency(item.price * item.quantity)}
+                    </p>
+                  </div>
+                  
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-destructive hover:text-destructive"
+                    onClick={() => removeFromCart(item.id, item.type)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 border-t bg-muted/30">
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-muted-foreground">Total</span>
+            <span className="text-2xl font-bold text-primary">{formatCurrency(total)}</span>
+          </div>
+          <Button
+            onClick={() => setShowPayment(true)}
+            disabled={cart.length === 0}
+            className="w-full"
+            size="lg"
+          >
+            <ShoppingCart className="mr-2 h-5 w-5" />
+            Finalizar Venda
+          </Button>
+        </div>
       </Card>
 
-      {/* Modal de pagamento */}
+      {/* Payment Modal */}
       <PaymentModal
         open={showPayment}
         onOpenChange={setShowPayment}
