@@ -25,8 +25,8 @@ const Demo: React.FC = () => {
   }, []);
 
   const handleStartDemo = () => {
-    // Redirect to dashboard in demo mode
-    navigate('/dashboard');
+    // Redirect to demo dashboard with fictional data
+    navigate('/demo/dashboard');
   };
 
   const demoFeatures = [
@@ -68,7 +68,7 @@ const Demo: React.FC = () => {
       <div className="border-b border-white/5 bg-slate-950/80 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/logo/ICONE - FB.svg" alt="GestorMEI" className="w-10 h-10" />
+            <img src="/logo/gestormei-icon.png" alt="GestorMEI" className="w-10 h-10" />
             <div>
               <span className="text-xl font-bold">GestorMEI</span>
               <Badge className="ml-2 bg-amber-500/20 text-amber-400 border-0">
@@ -168,8 +168,7 @@ const Demo: React.FC = () => {
             </Button>
             <Button 
               size="lg"
-              variant="outline"
-              className="w-full sm:w-auto h-12 px-8 border-white/20 text-white hover:bg-white/10"
+              className="w-full sm:w-auto h-12 px-8 bg-slate-700 hover:bg-slate-600 border border-white/20 text-white"
               onClick={handleStartDemo}
             >
               Continuar na Demo

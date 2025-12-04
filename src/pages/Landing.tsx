@@ -226,7 +226,7 @@ const Landing: React.FC = () => {
             {/* Logo */}
             <div className="flex items-center gap-3">
               <img 
-                src="/logo/ICONE - FB.svg" 
+                src="/logo/gestormei-icon.png" 
                 alt="GestorMEI" 
                 className="w-10 h-10 md:w-12 md:h-12"
               />
@@ -355,8 +355,7 @@ const Landing: React.FC = () => {
               </Link>
               <Button 
                 size="lg" 
-                variant="outline" 
-                className="w-full sm:w-auto h-14 px-8 text-lg border-white/20 text-white hover:bg-white/10 backdrop-blur-sm"
+                className="w-full sm:w-auto h-14 px-8 text-lg bg-slate-800 hover:bg-slate-700 border border-white/20 text-white backdrop-blur-sm"
                 onClick={handleStartDemo}
               >
                 <Play className="w-5 h-5 mr-2" />

@@ -13,6 +13,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Landing from "./pages/Landing";
 import Demo from "./pages/Demo";
+import DemoDashboard from "./pages/DemoDashboard";
 import Settings from "./pages/Settings";
 import PublicInvoice from "./pages/PublicInvoice";
 import PublicNF from "./pages/PublicNF";
@@ -86,6 +87,7 @@ function App() {
           {/* Rotas públicas - SEM autenticação necessária */}
           <Route path="/landing" element={<Landing />} />
           <Route path="/demo" element={<Demo />} />
+          <Route path="/demo/dashboard" element={<DemoDashboard />} />
           <Route path="/auth" element={user ? <Navigate to="/" replace /> : <Auth />} />
           <Route path="/nf/:id" element={<PublicNF />} />
           
