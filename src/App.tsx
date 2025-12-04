@@ -11,6 +11,7 @@ import { useAuth } from "./contexts/AuthContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import Landing from "./pages/Landing";
 import Settings from "./pages/Settings";
 import PublicInvoice from "./pages/PublicInvoice";
 import PublicNF from "./pages/PublicNF";
@@ -82,6 +83,7 @@ function App() {
 
         <Routes>
           {/* Rotas públicas - SEM autenticação necessária */}
+          <Route path="/landing" element={<Landing />} />
           <Route path="/auth" element={user ? <Navigate to="/" replace /> : <Auth />} />
           <Route path="/nf/:id" element={<PublicNF />} />
           
