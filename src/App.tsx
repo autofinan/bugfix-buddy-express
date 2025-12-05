@@ -22,6 +22,8 @@ import CashFlow from "./pages/reports/CashFlow";
 import ABCCurve from "./pages/reports/ABCCurve";
 import ServicesView from "./components/services/ServicesView";
 import FinancialAssistantView from "./components/financial-assistant/FinancialAssistantView";
+import Goals from "./pages/Goals";
+import Customers from "./pages/Customers";
 
 import Header from "./components/layout/Header";
 import { AppSidebar } from "./components/layout/AppSidebar";
@@ -68,10 +70,13 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-muted-foreground">Carregando...</p>
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-primary rounded-full blur-xl opacity-50 animate-pulse" />
+            <div className="relative animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mx-auto"></div>
+          </div>
+          <p className="mt-4 text-muted-foreground font-medium">Carregando...</p>
         </div>
       </div>
     );
@@ -90,11 +95,12 @@ function App() {
           <Route path="/demo/dashboard" element={<DemoDashboard />} />
           <Route path="/auth" element={user ? <Navigate to="/" replace /> : <Auth />} />
           <Route path="/nf/:id" element={<PublicNF />} />
+          <Route path="/comprovante/:id" element={<PublicNF />} />
           
           {user ? (
             <Route path="*" element={
               <SidebarProvider>
-                <div className="flex min-h-screen w-full bg-gradient-subtle">
+                <div className="flex min-h-screen w-full bg-background">
                   {/* Sidebar - colapsável no mobile e oculta em modo quiosque */}
                   {!isKioskMode && <AppSidebar />}
 
@@ -103,7 +109,7 @@ function App() {
                     {!isKioskMode && <Header />}
 
                     {/* main responsivo */}
-                    <main className={`flex-1 overflow-y-auto ${!isKioskMode ? 'p-3 sm:p-4 md:p-6' : 'p-0'} w-full`}>
+                    <main className={`flex-1 overflow-y-auto ${!isKioskMode ? 'p-4 md:p-6' : 'p-0'} w-full`}>
                       <div className="max-w-full mx-auto">
                         <Routes>
                           <Route path="/" element={<Index />} />
@@ -113,6 +119,8 @@ function App() {
                           <Route path="/bulk-products" element={<BulkProductsPage />} />
                           <Route path="/import-csv" element={<ImportCSVPage />} />
                           <Route path="/services" element={<ServicesView />} />
+                          <Route path="/goals" element={<Goals />} />
+                          <Route path="/customers" element={<Customers />} />
                           <Route 
                             path="/financial-assistant" 
                             element={
