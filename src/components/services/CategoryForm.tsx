@@ -41,17 +41,18 @@ const POPULAR_COLORS = [
 ];
 
 const POPULAR_ICONS = [
-  "wrench", "tool", "briefcase", "palette", "package",
-  "settings", "hammer", "cpu", "zap", "star",
-  "heart", "home", "building", "car", "smartphone",
-  "laptop", "camera", "music", "book", "coffee"
+  "Wrench", "Settings", "Briefcase", "Palette", "Package",
+  "Hammer", "Cpu", "Zap", "Star", "Heart",
+  "Home", "Building", "Car", "Smartphone", "Laptop",
+  "Camera", "Music", "BookOpen", "Coffee", "Scissors",
+  "Sparkles", "ShoppingBag", "Gift", "Paintbrush", "Lightbulb"
 ];
 
 export function CategoryForm({ open, onOpenChange, onSave, categoryToEdit }: CategoryFormProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [color, setColor] = useState("#4B5563");
-  const [icon, setIcon] = useState("briefcase");
+  const [icon, setIcon] = useState("Briefcase");
   const [profitMargin, setProfitMargin] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -72,7 +73,7 @@ export function CategoryForm({ open, onOpenChange, onSave, categoryToEdit }: Cat
     setName("");
     setDescription("");
     setColor("#4B5563");
-    setIcon("briefcase");
+    setIcon("Briefcase");
     setProfitMargin("");
   };
 
