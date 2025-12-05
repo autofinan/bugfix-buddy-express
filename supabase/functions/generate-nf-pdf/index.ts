@@ -64,7 +64,7 @@ serve(async (req) => {
     };
 
     // Preparar dados para retorno
-    const nfData = {
+    const comprovanteData = {
       saleId: sale.id,
       saleDate: sale.created_at,
       total: Number(sale.total),
@@ -92,7 +92,7 @@ serve(async (req) => {
     };
 
     return new Response(
-      JSON.stringify(nfData),
+      JSON.stringify(comprovanteData),
       { 
         status: 200, 
         headers: { 
