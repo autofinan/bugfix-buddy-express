@@ -7,9 +7,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Minus, Search } from "lucide-react";
+import { Plus, Minus, Search, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+
+interface Customer {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+}
 
 interface Product {
   id: string;
@@ -58,6 +65,8 @@ export function BudgetForm({ open, onOpenChange, onSave, budgetToEdit }: BudgetF
   const [discountValue, setDiscountValue] = useState(0);
   const [items, setItems] = useState<BudgetItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [searchProduct, setSearchProduct] = useState("");
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"pix" | "cartao" | "dinheiro">("pix");
@@ -66,6 +75,7 @@ export function BudgetForm({ open, onOpenChange, onSave, budgetToEdit }: BudgetF
   useEffect(() => {
     if (open) {
       fetchProducts();
+      fetchCustomers();
       if (budgetToEdit) {
         loadBudgetData(budgetToEdit);
       } else {
@@ -136,6 +146,38 @@ export function BudgetForm({ open, onOpenChange, onSave, budgetToEdit }: BudgetF
     setDiscountValue(0);
     setItems([]);
     setPaymentMethod("pix");
+    setSelectedCustomerId("");
+  };
+
+  const fetchCustomers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("customers")
+        .select("id, name, email, phone")
+        .eq("status", "active")
+        .order("name");
+
+      if (error) throw error;
+      setCustomers((data as Customer[]) || []);
+    } catch (error) {
+      console.error("Erro ao buscar clientes:", error);
+    }
+  };
+
+  const handleCustomerSelect = (customerId: string) => {
+    setSelectedCustomerId(customerId);
+    if (customerId === "manual") {
+      setCustomerName("");
+      setCustomerEmail("");
+      setCustomerPhone("");
+      return;
+    }
+    const customer = customers.find(c => c.id === customerId);
+    if (customer) {
+      setCustomerName(customer.name);
+      setCustomerEmail(customer.email || "");
+      setCustomerPhone(customer.phone || "");
+    }
   };
 
   const fetchProducts = async () => {
@@ -349,35 +391,67 @@ export function BudgetForm({ open, onOpenChange, onSave, budgetToEdit }: BudgetF
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Dados do Cliente */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Seleção de Cliente */}
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="customerName">Nome do Cliente</Label>
-              <Input
-                id="customerName"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="Nome do cliente"
-              />
+              <Label>Cliente</Label>
+              <Select value={selectedCustomerId} onValueChange={handleCustomerSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um cliente ou digite manualmente" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="manual">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Digitar manualmente
+                    </div>
+                  </SelectItem>
+                  {customers.map((customer) => (
+                    <SelectItem key={customer.id} value={customer.id}>
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        {customer.name}
+                        {customer.phone && <span className="text-muted-foreground text-xs">({customer.phone})</span>}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="customerEmail">Email</Label>
-              <Input
-                id="customerEmail"
-                type="email"
-                value={customerEmail}
-                onChange={(e) => setCustomerEmail(e.target.value)}
-                placeholder="email@exemplo.com"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="customerPhone">Telefone</Label>
-              <Input
-                id="customerPhone"
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                placeholder="(11) 99999-9999"
-              />
+
+            {/* Dados do Cliente */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="customerName">Nome do Cliente</Label>
+                <Input
+                  id="customerName"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Nome do cliente"
+                  disabled={selectedCustomerId && selectedCustomerId !== "manual"}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customerEmail">Email</Label>
+                <Input
+                  id="customerEmail"
+                  type="email"
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  placeholder="email@exemplo.com"
+                  disabled={selectedCustomerId && selectedCustomerId !== "manual"}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customerPhone">Telefone</Label>
+                <Input
+                  id="customerPhone"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  placeholder="(11) 99999-9999"
+                  disabled={selectedCustomerId && selectedCustomerId !== "manual"}
+                />
+              </div>
             </div>
           </div>
 
