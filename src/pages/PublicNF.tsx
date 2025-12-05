@@ -5,63 +5,44 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Printer } from "lucide-react";
 
-export default function PublicNF() {
+export default function PublicComprovante() {
   const { id } = useParams();
-  const [nfData, setNfData] = useState<any>(null);
+  const [comprovante, setComprovante] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
-      fetchNFData(id);
+      fetchComprovanteData(id);
     }
   }, [id]);
 
-  const fetchNFData = async (saleId: string) => {
+  const fetchComprovanteData = async (saleId: string) => {
     try {
       setLoading(true);
+      setError(null);
       
-      const { data: sale, error: saleError } = await supabase
-        .from("sales")
-        .select("*")
-        .eq("id", saleId)
-        .single();
+      // Usar a função RPC que permite acesso público
+      const { data, error: rpcError } = await supabase
+        .rpc('get_public_sale', { sale_id_param: saleId });
 
-      if (saleError) throw saleError;
-
-      const { data: items, error: itemsError } = await supabase
-        .from("sale_items")
-        .select(`
-          *,
-          products (name)
-        `)
-        .eq("sale_id", saleId);
-
-      if (itemsError) throw itemsError;
-
-      let storeSettings = null;
+      if (rpcError) throw rpcError;
       
-      if (sale.owner_id) {
-        const { data: settings } = await supabase
-          .from("store_settings")
-          .select("*")
-          .eq("owner_id", sale.owner_id)
-          .single();
-        
-        storeSettings = settings;
+      const result = data as { sale: any; items: any[]; store: any } | null;
+      
+      if (!result || !result.sale) {
+        setError("Comprovante não encontrado");
+        return;
       }
 
-      setNfData({
-        sale,
-        items: items.map(item => ({
-          name: item.products?.name || "Produto",
-          quantity: item.quantity,
-          unitPrice: item.unit_price,
-          totalPrice: item.total_price
-        })),
-        store: storeSettings
+      setComprovante({
+        sale: result.sale,
+        items: result.items || [],
+        store: result.store
       });
-    } catch (error) {
-      console.error("Erro ao carregar NF:", error);
+    } catch (err) {
+      console.error("Erro ao carregar comprovante:", err);
+      setError("Erro ao carregar comprovante de venda");
     } finally {
       setLoading(false);
     }
@@ -79,20 +60,25 @@ export default function PublicNF() {
       const { generateNFPDF } = await import('@/utils/generateNFPDF');
       
       const pdfData = {
-        saleId: nfData.sale.id,
-        saleDate: nfData.sale.date,
-        total: nfData.sale.total,
-        subtotal: nfData.sale.subtotal,
-        discountType: nfData.sale.discount_type,
-        discountValue: nfData.sale.discount_value,
-        paymentMethod: nfData.sale.payment_method,
-        note: nfData.sale.note,
-        items: nfData.items,
+        saleId: comprovante.sale.id,
+        saleDate: comprovante.sale.date,
+        total: comprovante.sale.total,
+        subtotal: comprovante.sale.subtotal,
+        discountType: comprovante.sale.discount_type,
+        discountValue: comprovante.sale.discount_value,
+        paymentMethod: comprovante.sale.payment_method,
+        note: comprovante.sale.note,
+        items: comprovante.items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          unitPrice: item.unit_price,
+          totalPrice: item.total_price
+        })),
         owner: {
-          name: nfData.store?.store_name,
-          cnpj: nfData.store?.cnpj,
-          address: nfData.store?.address,
-          phone: nfData.store?.phone
+          name: comprovante.store?.store_name,
+          cnpj: comprovante.store?.cnpj,
+          address: comprovante.store?.address,
+          phone: comprovante.store?.phone
         },
         plan: 'free' as const
       };
@@ -101,11 +87,11 @@ export default function PublicNF() {
       const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `nota-fiscal-${nfData.sale.id.substring(0, 8)}.pdf`;
+      link.download = `comprovante-${comprovante.sale.id.substring(0, 8)}.pdf`;
       link.click();
       URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Erro ao baixar PDF:", error);
+    } catch (err) {
+      console.error("Erro ao baixar PDF:", err);
     }
   };
 
@@ -116,18 +102,18 @@ export default function PublicNF() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-muted-foreground">Carregando nota fiscal...</div>
+        <div className="text-muted-foreground">Carregando comprovante...</div>
       </div>
     );
   }
 
-  if (!nfData) {
+  if (error || !comprovante) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Card className="max-w-md">
           <CardContent className="pt-6">
             <p className="text-center text-muted-foreground">
-              Nota fiscal não encontrada
+              {error || "Comprovante não encontrado"}
             </p>
           </CardContent>
         </Card>
@@ -154,26 +140,26 @@ export default function PublicNF() {
             <div className="flex items-start justify-between">
               <div>
                 <CardTitle className="text-2xl mb-2">GestorMEI</CardTitle>
-                <p className="text-lg font-semibold">NOTA FISCAL</p>
+                <p className="text-lg font-semibold">COMPROVANTE DE VENDA</p>
                 <p className="text-sm text-muted-foreground">
-                  NF Nº {nfData.sale.id.substring(0, 8).toUpperCase()}
+                  Nº {comprovante.sale.id.substring(0, 8).toUpperCase()}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Data: {new Date(nfData.sale.date).toLocaleDateString('pt-BR')} {new Date(nfData.sale.date).toLocaleTimeString('pt-BR')}
+                  Data: {new Date(comprovante.sale.date).toLocaleDateString('pt-BR')} {new Date(comprovante.sale.date).toLocaleTimeString('pt-BR')}
                 </p>
               </div>
             </div>
           </CardHeader>
 
           <CardContent className="pt-6 space-y-6">
-            {nfData.store && (
+            {comprovante.store && (
               <div>
                 <h3 className="font-semibold text-lg mb-2">EMITENTE</h3>
                 <div className="text-sm space-y-1">
-                  {nfData.store.store_name && <p>{nfData.store.store_name}</p>}
-                  {nfData.store.cnpj && <p>CNPJ: {nfData.store.cnpj}</p>}
-                  {nfData.store.address && <p>Endereço: {nfData.store.address}</p>}
-                  {nfData.store.phone && <p>Telefone: {nfData.store.phone}</p>}
+                  {comprovante.store.store_name && <p>{comprovante.store.store_name}</p>}
+                  {comprovante.store.cnpj && <p>CNPJ: {comprovante.store.cnpj}</p>}
+                  {comprovante.store.address && <p>Endereço: {comprovante.store.address}</p>}
+                  {comprovante.store.phone && <p>Telefone: {comprovante.store.phone}</p>}
                 </div>
               </div>
             )}
@@ -191,12 +177,12 @@ export default function PublicNF() {
                     </tr>
                   </thead>
                   <tbody>
-                    {nfData.items.map((item: any, index: number) => (
+                    {comprovante.items.map((item: any, index: number) => (
                       <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                         <td className="p-3 text-sm">{item.name}</td>
                         <td className="p-3 text-sm text-center">{item.quantity}</td>
-                        <td className="p-3 text-sm text-right">{formatCurrency(item.unitPrice)}</td>
-                        <td className="p-3 text-sm text-right font-medium">{formatCurrency(item.totalPrice)}</td>
+                        <td className="p-3 text-sm text-right">{formatCurrency(item.unit_price)}</td>
+                        <td className="p-3 text-sm text-right font-medium">{formatCurrency(item.total_price)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -207,46 +193,47 @@ export default function PublicNF() {
             <div className="border-t pt-4">
               <div className="flex justify-end">
                 <div className="space-y-2 min-w-64">
-                  {nfData.sale.subtotal && nfData.sale.subtotal !== nfData.sale.total && (
+                  {comprovante.sale.subtotal && comprovante.sale.subtotal !== comprovante.sale.total && (
                     <div className="flex justify-between text-sm">
                       <span>Subtotal:</span>
-                      <span>{formatCurrency(nfData.sale.subtotal)}</span>
+                      <span>{formatCurrency(comprovante.sale.subtotal)}</span>
                     </div>
                   )}
                   
-                  {nfData.sale.discount_value > 0 && (
+                  {comprovante.sale.discount_value > 0 && (
                     <div className="flex justify-between text-sm text-green-600">
                       <span>Desconto:</span>
                       <span>
-                        {nfData.sale.discount_type === 'percentage' 
-                          ? `${nfData.sale.discount_value}%` 
-                          : formatCurrency(nfData.sale.discount_value)}
+                        {comprovante.sale.discount_type === 'percentage' 
+                          ? `${comprovante.sale.discount_value}%` 
+                          : formatCurrency(comprovante.sale.discount_value)}
                       </span>
                     </div>
                   )}
                   
                   <div className="flex justify-between text-lg font-bold border-t pt-2">
                     <span>TOTAL:</span>
-                    <span>{formatCurrency(nfData.sale.total)}</span>
+                    <span>{formatCurrency(comprovante.sale.total)}</span>
                   </div>
                   
                   <div className="flex justify-between text-sm text-muted-foreground">
                     <span>Forma de pagamento:</span>
-                    <span className="capitalize">{nfData.sale.payment_method}</span>
+                    <span className="capitalize">{comprovante.sale.payment_method}</span>
                   </div>
                 </div>
               </div>
 
-              {nfData.sale.note && (
+              {comprovante.sale.note && (
                 <div className="mt-4 text-sm">
                   <span className="font-medium">Observações:</span>
-                  <p className="text-muted-foreground mt-1">{nfData.sale.note}</p>
+                  <p className="text-muted-foreground mt-1">{comprovante.sale.note}</p>
                 </div>
               )}
             </div>
 
             <div className="border-t pt-4 text-center text-xs text-muted-foreground">
               <p>Documento gerado automaticamente pelo GestorMEI</p>
+              <p>Este documento não possui valor fiscal</p>
               <p className="mt-1">https://gestormei.vercel.app</p>
             </div>
           </CardContent>
