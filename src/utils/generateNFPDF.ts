@@ -45,7 +45,7 @@ export async function generateNFPDF(data: NFData): Promise<Blob> {
   };
 
   // Gerar QR Code
-  const qrCodeUrl = `https://gestormei.vercel.app/nf/${data.saleId}`;
+  const qrCodeUrl = `https://gestormei.vercel.app/comprovante/${data.saleId}`;
   const qrCodeDataUrl = await QRCode.toDataURL(qrCodeUrl, { width: 80 });
 
   // Header com Logo e QR Code
@@ -58,12 +58,12 @@ export async function generateNFPDF(data: NFData): Promise<Blob> {
   
   y += 10;
   doc.setFontSize(16);
-  doc.text('NOTA FISCAL', margin, y);
+  doc.text('COMPROVANTE DE VENDA DETALHADO', margin, y);
   
   y += 10;
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text(`NF Nº ${data.saleId.substring(0, 8).toUpperCase()}`, margin, y);
+  doc.text(`Nº ${data.saleId.substring(0, 8).toUpperCase()}`, margin, y);
   doc.text(`Data: ${new Date(data.saleDate).toLocaleDateString('pt-BR')} ${new Date(data.saleDate).toLocaleTimeString('pt-BR')}`, margin, y + 5);
 
   // Separador
@@ -221,16 +221,17 @@ export async function generateNFPDF(data: NFData): Promise<Blob> {
   doc.setFontSize(8);
   doc.setTextColor(100, 100, 100);
   doc.text('Documento gerado automaticamente pelo GestorMEI', pageWidth / 2, footerY, { align: 'center' });
+  doc.text('Este documento não possui valor fiscal', pageWidth / 2, footerY + 4, { align: 'center' });
   
   // Marca d'água para plano free
   if (data.plan === 'free') {
     doc.setFontSize(7);
     doc.setTextColor(150, 150, 150);
-    doc.textWithLink('Criado gratuitamente no GestorMEI', pageWidth / 2, footerY + 5, {
+    doc.textWithLink('Criado gratuitamente no GestorMEI', pageWidth / 2, footerY + 9, {
       align: 'center',
       url: 'https://gestormei.vercel.app'
     });
-    doc.text('https://gestormei.vercel.app', pageWidth / 2, footerY + 9, { align: 'center' });
+    doc.text('https://gestormei.vercel.app', pageWidth / 2, footerY + 13, { align: 'center' });
   }
 
   return doc.output('blob');
